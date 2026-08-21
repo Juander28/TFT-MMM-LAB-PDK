@@ -22,10 +22,12 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from pdk_paths import DATA, MODEL_FILE, require_data  # noqa: E402
 from xls_reader import read_xls, sheet_columns  # noqa: E402
 
-ROOT = os.path.join(os.path.dirname(__file__), "..", "TFT")
+ROOT = DATA
 VDS_FILE = {"TFT1": "TFT1.xls", "TFT2": "TFT2.xls", "TFT3": "tft3.xls"}
 
 

@@ -20,7 +20,7 @@ set cells2 [cells list -all -circuit2]
 # igzo_tft - the only active device
 #
 # Pins, in the order the subcircuit declares them:
-#   1 d   2 g   3 s   4 b
+#   1 d   2 g   3 s        (a TFT has no bulk - there is no fourth pin)
 # Source and drain are physically identical - the same Au on the same island -
 # so they permute.
 #
@@ -63,6 +63,7 @@ if {[lsearch $cells1 $device] >= 0 && [lsearch $cells2 $device] >= 0} {
 }
 
 #-------------------------------------------
-# There is no substrate in this process - a TFT sits on glass.  The b pin of
-# igzo_tft is inert and magic names it GND, so tie B to GND in schematics.
+# There is no substrate in this process - a TFT sits on glass - and no bulk pin
+# on either side.  Magic emits three terminals because the msubcircuit line in
+# the techfile carries no substrate arguments.
 #-------------------------------------------

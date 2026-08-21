@@ -20,8 +20,6 @@ N 50 -410 90 -410 {
 lab=G}
 N 130 -380 130 -310 {
 lab=S}
-N 130 -410 230 -410 {
-lab=B}
 C {devices/code_shown.sym} 20 -160 0 0 {name=MODELS only_toplevel=true
 format="tcleval( @value )"
 value="
@@ -31,7 +29,6 @@ value="
 C {devices/lab_pin.sym} 50 -410 0 0 {name=l1 sig_type=std_logic lab=G}
 C {devices/lab_pin.sym} 130 -490 0 0 {name=l2 sig_type=std_logic lab=D}
 C {devices/lab_pin.sym} 130 -310 0 0 {name=l3 sig_type=std_logic lab=S}
-C {devices/lab_pin.sym} 230 -410 0 1 {name=l4 sig_type=std_logic lab=B}
 C {symbols/tft_igzo.sym} 110 -410 0 0 {name=M1
 W=1000u
 L=8u
@@ -46,7 +43,6 @@ value="
 vd d 0 0
 vg g 0 0
 vs s 0 0
-vb b 0 0
 .control
 save all
 dc vd 0 10 0.1 vg 0 6 1

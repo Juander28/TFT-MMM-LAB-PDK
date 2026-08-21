@@ -6,8 +6,11 @@
 #   igzo   4/0   semiconductor island, deposited first
 #   sd     6/0   Au source/drain, directly on the IGZO - the contact IS the
 #                overlap, there is no separate via layer
-#   oxetch 5/0   openings in the blanket 50 nm Al2O3 gate dielectric, over the
-#                S/D probe pads only
+#   oxetch 5/0   openings in the blanket 50 nm Al2O3 gate dielectric.  The
+#                gate goes down after the etch, so an opening with gate metal
+#                over it is a VIA between the two metals; an opening with
+#                nothing over it is a probe window, which is all the test chip
+#                uses it for
 #   gate   2/0   Au gate, last metal, above the dielectric
 #   align  8/0   alignment marks
 #
@@ -52,7 +55,9 @@ types
     active  sdc,sdcontact
     sd      sdmet,sdmetal,sdm
     gate    gatemet,gatemetal,g
+    gate    gsvia,gatesdvia
     comment oxetch,dielectric_opening
+    comment text,annotation
     comment align,alignment
     comment comment
 end
@@ -63,6 +68,10 @@ end
 #-----------------------------------------------------------------------------
 contact
     sdc igzo sdmet
+    # Gate metal reaching down through an opening in the dielectric onto the
+    # source/drain metal.  Same idea as sdc: the overlap is the contact, the
+    # only difference is that here the opening has to be drawn.
+    gsvia sdmet gatemet
 end
 
 #-----------------------------------------------------------------------------
@@ -80,13 +89,13 @@ end
 # drain either - it is the device.
 #-----------------------------------------------------------------------------
 connect
-    sdmet,sdc       sdmet,sdc
+    sdmet,sdc,gsvia sdmet,sdc,gsvia
     igzo,sdc        igzo,sdc
     # The channel type holds the gate connection: painting gate over IGZO
     # turns that tile into tftfet, and without listing it here the gate stripe
     # would be cut in two where it crosses the island.  Same reason gf180mcu
     # writes "connect *poly,allfets *poly,allfets".
-    gatemet,tftfet  gatemet,tftfet
+    gatemet,tftfet,gsvia  gatemet,tftfet,gsvia
 end
 
 #-----------------------------------------------------------------------------
@@ -99,8 +108,10 @@ styles
     sdc     ndiffusion  metal1 contact_X'es
     sdmet   metal1
     gatemet polysilicon
+    gsvia   metal1      polysilicon contact_X'es
     oxetch  overglass
     align   comment
+    text    comment
     comment comment
 end
 
@@ -124,7 +135,7 @@ style gdsii
 	labels igzo
 	calma 4 0
 
- layer SD sdmet,sdc
+ layer SD sdmet,sdc,gsvia
 	labels sdmet
 	calma 6 0
 
@@ -132,10 +143,10 @@ style gdsii
 	labels sdmet port
 	calma 6 10
 
- layer OXETCH oxetch
+ layer OXETCH oxetch,gsvia
 	calma 5 0
 
- layer GATE gatemet,tftfet
+ layer GATE gatemet,tftfet,gsvia
 	labels gatemet
 	calma 2 0
 
@@ -145,6 +156,10 @@ style gdsii
 
  layer ALIGN align
 	calma 8 0
+
+ layer TEXT text
+	labels text
+	calma 63 0
 
 end
 
@@ -171,18 +186,36 @@ style import
  layer sdc IGZO
 	and SD
 
+ # An opening in the dielectric over S/D metal.  With gate metal on top it is a
+ # via, without it a probe window.  Held as temporary layers so that the via
+ # can be cut out of both metals and out of the plain opening - a contact type
+ # occupies its own tile on both planes, so nothing else may be painted there.
+ templayer viaarea OXETCH
+	and SD
+
+ templayer viacut viaarea
+	and GATE
+
  layer sdmet SD
 	and-not IGZO
+	and-not viacut
 	labels SD
 	labels SDPIN port
 
+ layer gsvia viacut
+
  layer gatemet GATE
+	and-not viacut
 	labels GATE
 	labels GATEPIN port
 
  layer oxetch OXETCH
+	and-not viacut
 
  layer align ALIGN
+
+ layer text TEXT
+	labels TEXT
 
  calma IGZO    4 0
  calma SD      6 0
@@ -191,6 +224,7 @@ style import
  calma GATE    2 0
  calma GATEPIN 2 10
  calma ALIGN   8 0
+ calma TEXT   63 0
 
 end
 
@@ -218,6 +252,14 @@ drc
  # along its whole length.  5 um per side is what the test chip draws.
  surround tftfet gatemet 5000 absence_illegal \
 	"Gate overlap of the channel < 5 um (GATE.3)"
+
+ # The via between the two metals.  Both have to cover it with margin, or the
+ # connection is made by whatever the alignment happens to leave.
+ width gsvia 5000 "Gate-to-S/D via smaller than 5 um (VIA.1)"
+ surround gsvia gatemet 5000 absence_illegal \
+	"Gate enclosure of the via < 5 um (VIA.2)"
+ surround gsvia sdmet 5000 absence_illegal \
+	"S/D enclosure of the via < 5 um (VIA.3)"
 
  # The Au has to land on enough semiconductor.  This is a width rule, not an
  # enclosure rule: the electrodes deliberately run off the island towards the
@@ -267,11 +309,12 @@ extract
 
  # The device.  Its terminals are the two contacted ends of the island.
  #
- # There is no substrate - a TFT sits on glass - so the fourth pin is named
- # GND and carries no current: the igzo_tft subcircuit in
- # libs.tech/ngspice/design.ngspice ties the intrinsic bulk to its own source
- # and holds b through a 1 Tohm resistor.  Tie the B pin of the symbol to GND
- # in schematics, and layout and schematic will agree pin for pin.
+ # THREE TERMINALS, in the order D G S.  There is no substrate - a TFT sits on
+ # glass - and leaving the substrate arguments off the msubcircuit line is what
+ # stops magic appending a fourth pin.  Do not switch this to "device
+ # subcircuit": that form also emits three pins, but in the order G S D, which
+ # would silently disagree with the symbol.  The pin order is what LVS checks
+ # first, and a swapped gate is the one mistake that still simulates.
  #
  # A NOTE ON THE EXTRACTED WIDTH.  l comes out exactly right - it is the gap
  # between the electrodes.  w does not: the extractor measures the gated
@@ -281,7 +324,7 @@ extract
  # device width is the electrode length, not the island height.  Expect
  # extraction to report roughly 13 % more; libs.tech/netgen/setup.tcl allows
  # for it.  Drawing the island flush with the electrodes makes it exact.
- device msubcircuit igzo_tft tftfet sdc,igzo sdc,igzo space GND l=l w=w
+ device msubcircuit igzo_tft tftfet sdc,igzo sdc,igzo l=l w=w
 
 end
 

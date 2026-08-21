@@ -15,17 +15,18 @@ import tempfile
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from pdk_paths import DATA, MODEL_FILE, require_data  # noqa: E402
 from xls_reader import read_xls, sheet_columns  # noqa: E402
 
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+ROOT = DATA
 VDSF = {"TFT1": "TFT1.xls", "TFT2": "TFT2.xls", "TFT3": "tft3.xls"}
-MODEL_LIB = os.path.join(ROOT, "test1", "models", "tft_igzo_test1.lib")
 SC = os.environ.get("SCRATCH", tempfile.gettempdir())
 
 
 def measured(chip, want_tr, want_L, want_W):
-    for name, cells in read_xls(os.path.join(ROOT, "TFT", chip, "VDS", VDSF[chip])).items():
+    for name, cells in read_xls(require_data(chip, "VDS", VDSF[chip])).items():
         m = re.match(r"(\d+)_(\d+)_L(\d+)_W(\d+)$", name)
         if not m:
             continue
@@ -44,15 +45,20 @@ def measured(chip, want_tr, want_L, want_W):
     return None
 
 
-def simulate(model, W, L, vgs_list, vdmax=10.0, npts=201):
-    """Return {vgs: (vd, id)} from ngspice for one device."""
+def simulate(corner, W, L, vgs_list, vdmax=10.0, npts=201):
+    """
+    Return {vgs: (vd, id)} from ngspice for one device.
+
+    This runs against the PDK's own corner sections, not against a loose model
+    file - so the check says whether *the PDK* still reproduces the silicon.
+    """
     out = {}
     for vg in vgs_list:
         net = f"""* device check
-.include {MODEL_LIB}
+.lib {MODEL_FILE} {corner}
 VD d 0 1
 VG g 0 {vg}
-M1 d g 0 0 {model} w={W}u l={L}u
+M1 d g 0 0 IGZO_TFT w={W}u l={L}u
 .dc VD 0 {vdmax} {vdmax/(npts-1)}
 .control
 run
@@ -69,12 +75,12 @@ quit
     return out
 
 
-def compare(chip, tr, L, W, model):
+def compare(chip, tr, L, W, corner):
     meas = measured(chip, tr, L, W)
     if not meas:
         return None
     vgs = sorted(v for v in meas if v > 0)
-    sim = simulate(model, W, L, vgs)
+    sim = simulate(corner, W, L, vgs)
     rows = []
     for vg in vgs:
         vdm, idm = meas[vg]
@@ -93,25 +99,25 @@ def main():
     print("MODEL vs MEASUREMENT - simulated in ngspice at the device's own W, L")
     print("=" * 78)
     cases = [
-        ("TFT1", 1, 160.0, 100.0, "TFT_IGZO_BEST"),
-        ("TFT1", 1, 80.0, 500.0, "TFT_IGZO_BEST"),
-        ("TFT1", 2, 40.0, 100.0, "TFT_IGZO_BEST"),
-        ("TFT1", 1, 20.0, 500.0, "TFT_IGZO_BEST"),
-        ("TFT1", 1, 10.0, 1000.0, "TFT_IGZO_SHORT"),
-        ("TFT1", 2, 8.0, 1000.0, "TFT_IGZO_SHORT"),
+        ("TFT1", 1, 160.0, 100.0, "best"),
+        ("TFT1", 1, 80.0, 500.0, "best"),
+        ("TFT1", 2, 40.0, 100.0, "best"),
+        ("TFT1", 1, 20.0, 500.0, "best"),
+        ("TFT1", 1, 10.0, 1000.0, "short"),
+        ("TFT1", 2, 8.0, 1000.0, "short"),
     ]
-    print(f"{'chip':5} {'tr':>2} {'L':>4} {'W':>6} {'model':16} {'VGS':>4} "
+    print(f"{'chip':5} {'tr':>2} {'L':>4} {'W':>6} {'corner':16} {'VGS':>4} "
           f"{'Isat meas':>11} {'Isat sim':>11} {'sim/meas':>9}")
     allr = []
-    for chip, tr, L, W, model in cases:
-        rows = compare(chip, tr, L, W, model)
+    for chip, tr, L, W, corner in cases:
+        rows = compare(chip, tr, L, W, corner)
         if not rows:
             print(f"{chip} {tr} L{L:.0f} W{W:.0f}: not found")
             continue
         for vg, im, isim, r in rows:
             allr.append(r)
             flag = "" if 0.5 <= r <= 2.0 else "   <-- off"
-            print(f"{chip:5} {tr:2d} {L:4.0f} {W:6.0f} {model:16} {vg:4.0f} "
+            print(f"{chip:5} {tr:2d} {L:4.0f} {W:6.0f} {corner:16} {vg:4.0f} "
                   f"{im*1e6:9.2f}uA {isim*1e6:9.2f}uA {r:9.2f}{flag}")
     a = np.array(allr)
     print()

@@ -22,7 +22,7 @@
 *************************************************************************
 ** igzo_tft - the device a schematic instantiates
 **
-**   XM1 d g s b igzo_tft W=100u L=10u ov=5u nf=1 m=1
+**   XM1 d g s igzo_tft W=100u L=10u ov=5u nf=1 m=1
 **
 ** m is ngspice's own subcircuit multiplier - it is not declared as a
 ** parameter here, ngspice replicates the whole wrapper (device, contacts and
@@ -40,9 +40,11 @@
 **      overlap this is 7.82 fF per um of width, and it is the parasitic that
 **      decides whether a tuned stage works: it stops scaling with L, so fT
 **      flattens out as 1/L instead of 1/L^2.  Sweeping `ov` is the point.
-**   3. A bulk pin that goes nowhere.  A TFT has no body; b is kept so the
-**      symbol drops into existing four-pin testbenches, and the intrinsic
-**      device ties its own bulk to the source.
+**   3. Three terminals, and only three.  A TFT has no body: it sits on glass.
+**      The intrinsic level-1 device still needs a bulk node, so the wrapper
+**      ties it to its own source and never exposes it.  Nothing outside the
+**      subcircuit can connect to it, which is the point - a bulk pin on a
+**      device that has no bulk is an invitation to wire it somewhere.
 **
 ** nf is carried for layout and LVS only.  Fingering does NOT change gm or
 ** fT - measured, and confirmed in simulation for nf = 1..20 at constant total
@@ -52,14 +54,12 @@
 ** That is one sample of one cell, so it is not applied here; if you want the
 ** printed device, pass the printed L yourself.
 *************************************************************************
-.subckt igzo_tft d g s b W=100u L=10u ov=5u nf=1
+.subckt igzo_tft d g s W=100u L=10u ov=5u nf=1
 Rd  d  di 'rc_w/W'
 Rs  s  si 'rc_w/W'
 M1  di g  si si IGZO_TFT W='W' L='L'
 Cgd g  di 'cox_area*ov*W'
 Cgs g  si 'cox_area*ov*W'
-* the bulk pin is inert - a large resistor keeps it from floating
-Rb  b  s  1T
 .ends igzo_tft
 
 *************************************************************************

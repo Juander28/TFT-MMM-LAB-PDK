@@ -7,10 +7,13 @@
 
       1. igzo   (4/0)   semiconductor island
       2. sd     (6/0)   source/drain contacts, Au, directly on the IGZO
-      3. oxetch (5/0)   openings in the blanket Al2O3 gate dielectric
+      3. oxetch (5/0)   openings in the blanket Al2O3 gate dielectric - a via
+                        between sd and gate where gate covers one, a probe
+                        window where nothing does
       4. gate   (2/0)   gate electrode, Au, on top of the dielectric
 
-  plus align (8/0), the alignment marks.  This is a TOP-GATE COPLANAR TFT:
+  plus align (8/0), the alignment marks, and text (63/0), which carries the
+  values the parametric cells print on themselves and is not a mask.  This is a TOP-GATE COPLANAR TFT:
   the semiconductor is deposited first and the gate is the last metal.
 
   The 50 nm Al2O3 gate dielectric is a blanket ALD film - it is not drawn,
@@ -159,6 +162,21 @@
   <animation>0</animation>
   <name>align.drawing - 8/0</name>
   <source>8/0@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ffffff</frame-color>
+  <fill-color>#ffffff</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I0</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>text.drawing - 63/0</name>
+  <source>63/0@1</source>
  </properties>
  <name>igzo_mmm_lab</name>
 </layer-properties>

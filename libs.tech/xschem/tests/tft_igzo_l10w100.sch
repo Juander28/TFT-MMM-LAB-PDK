@@ -11,10 +11,8 @@ v {xschem version=3.4.5 file_version=1.2
 *
 * compares the drawn device against the schematic one.
 *
-* B is tied to GND: a TFT has no body, magic names that inert pin GND, and
-* the igzo_tft subcircuit holds it through a 1 Tohm resistor.  GND is brought
-* out as a pin so that both sides of LVS have it - magic declares it .global
-* and netgen promotes it to a port on the layout side.
+* Three pins, D G S: a TFT has no body.  The igzo_tft subcircuit keeps the
+* intrinsic device's bulk tied to its own source, inside.
 }
 G {}
 K {}
@@ -27,12 +25,9 @@ N 50 -410 90 -410 {
 lab=G}
 N 130 -380 130 -310 {
 lab=S}
-N 130 -410 230 -410 {
-lab=GND}
 C {devices/iopin.sym} 130 -490 0 0 {name=p1 lab=D}
 C {devices/iopin.sym} 50 -410 0 1 {name=p2 lab=G}
 C {devices/iopin.sym} 130 -310 0 0 {name=p3 lab=S}
-C {devices/iopin.sym} 230 -410 0 0 {name=p4 lab=GND}
 C {symbols/tft_igzo.sym} 110 -410 0 0 {name=M1
 W=100u
 L=10u

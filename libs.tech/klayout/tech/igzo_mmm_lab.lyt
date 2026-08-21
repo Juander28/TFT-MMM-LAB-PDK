@@ -45,13 +45,16 @@
  </writer-options>
  <connectivity>
   <!--
-    Two independent conductors.  The gate (2/0) is separated from the
-    source/drain metal (6/0) by the blanket Al2O3 everywhere - oxetch (5/0)
-    opens that film only over the S/D probe pads, never between the two
-    conductors - and the IGZO island (4/0) is deliberately NOT declared as a
-    connection between source and drain.  In a TFT the channel
-    is a device, not a short: declaring it here would merge S and D into one
-    net and every extracted netlist would be silently wrong.
+    Two conductors and one via.  The gate (2/0) is separated from the
+    source/drain metal (6/0) by the blanket Al2O3 - except where oxetch (5/0)
+    opens that film.  The gate is deposited after the etch, so an opening with
+    gate metal over it is a VIA: the two metals touch.  An opening with no gate
+    over it is just a probe window, which is all the test chip uses it for.
+
+    The IGZO island (4/0) is deliberately NOT declared as a connection between
+    source and drain.  In a TFT the channel is a device, not a short: declaring
+    it here would merge S and D into one net and every extracted netlist would
+    be silently wrong.
   -->
   <symbols>GATE='2/0+2/10'</symbols>
   <symbols>SD='6/0+6/10'</symbols>
@@ -60,5 +63,7 @@
        parses; here the pin layer plays the role of the via. -->
   <connection>2/0,2/10,2/0</connection>
   <connection>6/0,6/10,6/0</connection>
+  <!-- gate to source/drain metal through an opening in the dielectric -->
+  <connection>2/0,5/0,6/0</connection>
  </connectivity>
 </technology>

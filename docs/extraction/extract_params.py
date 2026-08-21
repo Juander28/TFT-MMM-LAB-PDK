@@ -26,10 +26,12 @@ import os
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "tools"))
+from pdk_paths import DATA, MODEL_FILE, require_data  # noqa: E402
 from xls_reader import read_xls, sheet_columns  # noqa: E402
 
-ROOT = os.path.join(os.path.dirname(__file__), "..", "TFT")
+ROOT = DATA
 CHIPS = ("TFT1", "TFT2", "TFT3")
 VDS_FILE = {"TFT1": "TFT1.xls", "TFT2": "TFT2.xls", "TFT3": "tft3.xls"}
 
@@ -222,7 +224,7 @@ def main():
                   f"-> lambda = {1/np.median(np.abs(va)):.4f} 1/V")
         np.save(os.path.join(os.path.dirname(__file__), "params.npy"),
                 np.array(rows, dtype=object), allow_pickle=True)
-        print(f"\nsaved {len(rows)} device fits -> tft/params.npy")
+        print(f"\nsaved {len(rows)} device fits -> docs/extraction/params.npy")
 
 
 if __name__ == "__main__":

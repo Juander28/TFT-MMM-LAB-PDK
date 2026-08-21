@@ -4,6 +4,9 @@
 # first).  The 50 nm Al2O3 gate dielectric is a blanket ALD film and has no
 # mask of its own; only its openings are drawn, on oxetch.
 #
+# oxetch does double duty: an opening with gate metal over it is a via between
+# the two metals, and an opening with nothing over it is a probe window.
+#
 # name     purposes                  layer datatype
 igzo       drawing                     4     0
 sd         drawing                     6     0
@@ -14,3 +17,5 @@ gate       drawing                     2     0
 gate       PIN,NET,SPNET               2    10
 gate       LABEL                       2    20
 align      drawing                     8     0
+# not a mask: the value a parametric cell prints on itself
+text       drawing                    63     0

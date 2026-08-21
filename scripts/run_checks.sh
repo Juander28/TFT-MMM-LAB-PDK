@@ -76,8 +76,8 @@ XRC
 # itself is what gets checked, not the exit status.
 ( cd "${WORK}" && xschem -n -q --rcfile "${WORK}/xschemrc" \
     "${ROOT}/libs.tech/xschem/tests/tft_iv.sch" > "${WORK}/xschem.log" 2>&1 ) || true
-grep -qE "^XM1 D G S B igzo_tft W=1000u L=8u" "${WORK}/tft_iv.spice" \
-    && pass "xschem netlists the symbol with pins in D G S B order" \
+grep -qE "^XM1 D G S igzo_tft W=1000u L=8u" "${WORK}/tft_iv.spice" \
+    && pass "xschem netlists the symbol with pins in D G S order" \
     || { cat "${WORK}/tft_iv.spice"; fail "xschem netlist"; }
 
 # --- 5. the model against the measurement ------------------------------------
@@ -86,7 +86,7 @@ cat > "${WORK}/val.spice" <<SP
 * Measured 670-701 uA; docs/extraction/validate_model.py gives 654 uA.
 .include ${PDKPATH}/libs.tech/ngspice/design.ngspice
 .lib ${PDKPATH}/libs.tech/ngspice/igzo_mmm_lab.ngspice best
-XM1 d g 0 0 igzo_tft W=1000u L=8u ov=5u
+XM1 d g 0 igzo_tft W=1000u L=8u ov=5u
 Vd d 0 10
 Vg g 0 6
 .op

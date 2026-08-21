@@ -5,19 +5,20 @@ v {xschem version=3.4.5 file_version=1.2
 * Adapted from gf180mcuD/libs.tech/xschem/symbols/nfet_10v0_asym.sym
 * (Apache-2.0, GlobalFoundries PDK Authors).
 *
-* The pin boxes below are declared in the order D, G, S, B, and @pinlist
-* expands in exactly that order - it must match
-*     .subckt igzo_tft d g s b
+* THREE TERMINALS.  A TFT sits on glass and has no body, so there is no bulk
+* pin to bring out: the wrapper subcircuit ties the intrinsic device's bulk to
+* its own source and keeps it inside.  A bulk pin on a device with no bulk is
+* an invitation to wire it somewhere.
+*
+* The pin boxes below are declared in the order D, G, S, and @pinlist expands
+* in exactly that order - it must match
+*     .subckt igzo_tft d g s
 * in libs.tech/ngspice/design.ngspice.  Get the order wrong and the netlist is
 * silently wrong.
 *
 * W, L and ov are drawn dimensions in metres.  spiceprefix=X because the
 * device is a subcircuit: the wrapper carries the measured contact resistance
 * and the overlap capacitance around the intrinsic level-1 model.
-*
-* B is inert.  A TFT has no body; the pin is kept so this symbol drops into
-* four-pin testbenches unchanged, and the wrapper ties the intrinsic bulk to
-* the source itself.
 }
 G {}
 K {type=nmos
@@ -47,10 +48,8 @@ B 4 -5 -15 -2.5 15 {}
 B 5 17.5 -32.5 22.5 -27.5 {name=D dir=inout}
 B 5 -22.5 -2.5 -17.5 2.5 {name=G dir=in}
 B 5 17.5 27.5 22.5 32.5 {name=S dir=inout}
-B 5 19.921875 -0.078125 20.078125 0.078125 {name=B dir=in}
 T {S} 22.5 17.5 0 0 0.15 0.15 {layer=7}
 T {D} 22.5 -17.5 2 1 0.15 0.15 {layer=7}
-T {B} 20 -10 0 0 0.15 0.15 {layer=7}
 T {G} -10 -10 0 1 0.15 0.15 {layer=7}
 T {@name} 30 -20 0 0 0.2 0.2 {}
 T {@model} 30 -8.75 0 0 0.2 0.2 {}

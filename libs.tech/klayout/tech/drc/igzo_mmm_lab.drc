@@ -60,6 +60,11 @@ channel = igzo & gate - sd
 sdcon   = igzo & sd
 # Where the gate runs over an electrode - the overlap that sets the parasitic.
 gate_ov = gate & sd
+# An opening with gate metal over it is a via between the two metals; an
+# opening with nothing over it is a probe window.  They are different devices
+# with different rules, so they are separated here.
+via     = oxetch & sd & gate
+window  = oxetch - gate
 
 # --- minimum drawn dimensions ------------------------------------------------
 igzo.width(5.um).output(
@@ -91,14 +96,22 @@ sdcon.width(5.um).output(
   "IGZO.2", "S/D contact overlap on the IGZO < 5 um")
 
 # --- dielectric openings ------------------------------------------------------
-# The window in the blanket Al2O3 has to stay inside the pad it opens, with
-# margin: 400 x 400 um pads carry 360 x 360 um windows on the test chip.
+# Any opening has to land on the metal it is meant to expose.
 oxetch.not_inside(sd).output(
   "OX.1", "Dielectric opening outside the S/D metal it exposes")
-oxetch.enclosed(sd, 20.um).output(
-  "OX.2", "S/D enclosure of the dielectric opening < 20 um")
-# An opening over the gate would short a probe to the gate metal.
-(oxetch & gate).output(
-  "OX.3", "Dielectric opening over the gate metal")
+# A probe window: 400 x 400 um pads carry 360 x 360 um windows on the test chip.
+window.enclosed(sd, 20.um).output(
+  "OX.2", "S/D enclosure of a probe window < 20 um")
+
+# --- vias ---------------------------------------------------------------------
+# The gate is deposited after the etch, so an opening covered by gate metal is
+# a via: the two metals touch.  Both metals have to cover it with margin, or
+# the connection is made by whatever the alignment happens to leave.
+via.width(5.um).output(
+  "VIA.1", "Gate-to-S/D via smaller than 5 um")
+via.enclosed(gate, 5.um).output(
+  "VIA.2", "Gate enclosure of the via < 5 um")
+via.enclosed(sd, 5.um).output(
+  "VIA.3", "S/D enclosure of the via < 5 um")
 
 align.output("ALIGN.info", "Alignment marks (informational, not a violation)") if $keep_align
