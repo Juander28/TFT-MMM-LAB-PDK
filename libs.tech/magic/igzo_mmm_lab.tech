@@ -286,6 +286,19 @@ extract
 end
 
 #-----------------------------------------------------------------------------
+# Plotting.  "default" means: plot every type with its display style, which is
+# what makes `plot pnm out.pnm` produce a picture of the layout instead of a
+# blank page.  Without this section magic warns "No plot section in techfile"
+# and draws nothing for types it does not recognise - which here is all of
+# them, since none of them are MOS layers.
+#-----------------------------------------------------------------------------
+plot
+  style pnm
+     default
+     draw align no_color_at_all
+end
+
+#-----------------------------------------------------------------------------
 # Wiring and routing are not used: this PDK has no router support.
 #-----------------------------------------------------------------------------
 wiring

@@ -14,3 +14,6 @@ measurements/*
 __pycache__/
 *.pyc
 .xschem_ctrl*
+
+# PDFs are not tracked here - they are generated documents
+*.pdf
