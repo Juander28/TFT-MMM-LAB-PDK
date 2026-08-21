@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Registers the IGZO TFT PCell library when KLayout starts.
+
+  Modelled on gf180mcuD/libs.tech/klayout/tech/pymacros/gf180mcu.lym
+  (Apache-2.0, GlobalFoundries PDK Authors).  Without autorun the cells exist
+  on disk but never appear in the library browser.
+-->
+<klayout-macro>
+ <description>IGZO TFT (igzo_mmm_lab) PCell library</description>
+ <version>1.0</version>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>true</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>
+import os
+import sys
+
+technology_macros_path = os.path.dirname(os.path.abspath(__file__))
+if technology_macros_path not in sys.path:
+    sys.path.insert(0, technology_macros_path)
+
+from cells import igzo_mmm_lab_pr
+
+# Instantiate and register the library
+igzo_mmm_lab_pr()
+
+print("## igzo_mmm_lab PDK PCells loaded.")
+</text>
+</klayout-macro>

@@ -1,0 +1,72 @@
+* ==========================================================================
+* Global settings and device wrappers - UCI/INRF IGZO TFT (igzo_mmm_lab)
+*
+* A netlist pulls in this file and one corner section:
+*     .include $PDK_ROOT/$PDK/libs.tech/ngspice/design.ngspice
+*     .lib     $PDK_ROOT/$PDK/libs.tech/ngspice/igzo_mmm_lab.ngspice tt
+* (in xschem, $::IGZO_MODELS expands to that directory - see the testbench in
+* libs.tech/xschem/tests/tft_iv.sch)
+*
+* Same split as gf180mcuD: one file of switches and wrappers, one file of
+* models, so a corner run is a one-line change instead of a netlist edit.
+* ==========================================================================
+
+*************************************************************************
+** Process constants, all measured
+*************************************************************************
+.param
++  cox_area = 1.564e-3   $ F/m^2   50 nm Al2O3, from the 400x400 um plate
++  rc_w     = 3.3        $ Ohm*m   per contact; 2*Rc*W = 6.6e6 Ohm*um at VGS=6V
++  l_bias   = 3e-6       $ m       drawn-to-printed bias, ONE sample - see below
+
+*************************************************************************
+** igzo_tft - the device a schematic instantiates
+**
+**   XM1 d g s b igzo_tft W=100u L=10u ov=5u nf=1 m=1
+**
+** m is ngspice's own subcircuit multiplier - it is not declared as a
+** parameter here, ngspice replicates the whole wrapper (device, contacts and
+** overlap caps together), which is what a parallel device really is.
+**
+** W, L and ov are in metres and are DRAWN dimensions.  Three things are
+** wrapped around the intrinsic level-1 model:
+**
+**   1. Contact resistance.  Rc = 3.3/W per contact, measured from R_on
+**      against L.  This is what makes short devices collapse; carrying it
+**      explicitly means the tt corner can be used at any L instead of
+**      switching to the `short` corner, which hides the same physics inside
+**      a smaller Kp.
+**   2. Overlap capacitance, Cov = Cox * ov * W per side.  At the drawn 5 um
+**      overlap this is 7.82 fF per um of width, and it is the parasitic that
+**      decides whether a tuned stage works: it stops scaling with L, so fT
+**      flattens out as 1/L instead of 1/L^2.  Sweeping `ov` is the point.
+**   3. A bulk pin that goes nowhere.  A TFT has no body; b is kept so the
+**      symbol drops into existing four-pin testbenches, and the intrinsic
+**      device ties its own bulk to the source.
+**
+** nf is carried for layout and LVS only.  Fingering does NOT change gm or
+** fT - measured, and confirmed in simulation for nf = 1..20 at constant total
+** width.  Splitting W leaves gm and Cgs both split, so their ratio is fixed.
+**
+** L is the DRAWN length.  The process prints it about 3 um wider (l_bias).
+** That is one sample of one cell, so it is not applied here; if you want the
+** printed device, pass the printed L yourself.
+*************************************************************************
+.subckt igzo_tft d g s b W=100u L=10u ov=5u nf=1
+Rd  d  di 'rc_w/W'
+Rs  s  si 'rc_w/W'
+M1  di g  si si IGZO_TFT W='W' L='L'
+Cgd g  di 'cox_area*ov*W'
+Cgs g  si 'cox_area*ov*W'
+* the bulk pin is inert - a large resistor keeps it from floating
+Rb  b  s  1T
+.ends igzo_tft
+
+*************************************************************************
+** cap_mim - the S/D-metal / Al2O3 / gate-metal overlap capacitor
+**   XC1 p m cap_mim W=400u L=400u
+** p is the gate-metal (upper) plate, m the S/D-metal (lower) plate.
+*************************************************************************
+.subckt cap_mim p m W=400u L=400u
+C1 p m 'cox_area*W*L'
+.ends cap_mim

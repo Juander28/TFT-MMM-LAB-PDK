@@ -1,0 +1,16 @@
+# Raw measurement data is not tracked - see measurements/README.md
+measurements/*
+!measurements/README.md
+
+# Tool output
+*.ext
+*.res.ext
+*.sim
+*.nodes
+*.lyrdb
+*.raw
+*.log
+*.out
+__pycache__/
+*.pyc
+.xschem_ctrl*

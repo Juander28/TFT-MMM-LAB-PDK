@@ -1,0 +1,17 @@
+magic
+tech igzo_mmm_lab
+timestamp 1615919903
+<< checkpaint >>
+rect -40500 -40500 40500 20500
+<< sdmet >>
+rect -20000 -40000 20000 20000
+<< gatemet >>
+rect -40000 -20000 40000 20000
+<< oxetch >>
+rect -18000 -38000 18000 -22000
+<< labels >>
+rlabel sdmet s -1000 -31000 1000 -29000 4 MINUS
+port 1 nsew
+rlabel gatemet s 29000 -1000 31000 1000 4 PLUS
+port 3 nsew
+<< end >>

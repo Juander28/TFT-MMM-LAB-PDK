@@ -1,0 +1,45 @@
+#### xschem configuration for the UCI/INRF IGZO TFT process (igzo_mmm_lab)
+####
+#### Sourced by the user's ~/.xschem/xschemrc, which does
+####     source $env(PDK_ROOT)/$env(PDK)/libs.tech/xschem/xschemrc
+#### so selecting the PDK is enough to make the symbols findable.
+####
+#### Structure follows gf180mcuD/libs.tech/xschem/xschemrc.
+
+#### Locate the PDK
+if { [info exists env(PDK_ROOT)] && $env(PDK_ROOT) ne {} } {
+  set PDK_ROOT $env(PDK_ROOT)
+} else {
+  puts stderr {igzo_mmm_lab: PDK_ROOT is not set - run install.sh, or set it by hand}
+}
+if { [info exists env(PDK)] && $env(PDK) ne {} } {
+  set PDK $env(PDK)
+} else {
+  set PDK TFT-MMM-LAB-PDK
+}
+
+set IGZO_PDK_PATH ${PDK_ROOT}/${PDK}
+
+#### Where the SPICE models live.  Testbenches refer to $::IGZO_MODELS, the
+#### same way gf180mcu testbenches refer to $::180MCU_MODELS.
+set IGZO_MODELS ${IGZO_PDK_PATH}/libs.tech/ngspice
+puts stderr "igzo_mmm_lab: IGZO_MODELS = $IGZO_MODELS"
+
+#### Library path.  Flush and rebuild it the way gf180mcuD does, so that the
+#### stock xschem devices (lab_pin, code_shown, vsource, ...) are found even
+#### when xschem is started from an arbitrary directory.
+set XSCHEM_LIBRARY_PATH {}
+append XSCHEM_LIBRARY_PATH :${XSCHEM_SHAREDIR}/xschem_library/devices
+append XSCHEM_LIBRARY_PATH :${XSCHEM_SHAREDIR}/xschem_library
+append XSCHEM_LIBRARY_PATH :$env(PWD)
+append XSCHEM_LIBRARY_PATH :$USER_CONF_DIR/xschem_library
+
+#### Symbols and example testbenches of this PDK
+append XSCHEM_LIBRARY_PATH :${IGZO_PDK_PATH}/libs.tech/xschem
+append XSCHEM_LIBRARY_PATH :${IGZO_PDK_PATH}/libs.tech/xschem/tests
+
+#### Open this when xschem starts with no file argument
+set XSCHEM_START_WINDOW ${IGZO_PDK_PATH}/libs.tech/xschem/tests/tft_iv.sch
+
+#### Colour the PDK symbols so they are distinguishable from the generic ones
+set dircolor(${IGZO_PDK_PATH}/libs.tech/xschem$) green

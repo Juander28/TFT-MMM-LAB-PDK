@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Layer properties for the UCI/INRF IGZO TFT process (igzo_mmm_lab).
+
+  Listed in PROCESS ORDER, bottom of the stack first, which is the order the
+  four masks are actually run:
+
+      1. igzo   (4/0)   semiconductor island
+      2. sd     (6/0)   source/drain contacts, Au, directly on the IGZO
+      3. oxetch (5/0)   openings in the blanket Al2O3 gate dielectric
+      4. gate   (2/0)   gate electrode, Au, on top of the dielectric
+
+  plus align (8/0), the alignment marks.  This is a TOP-GATE COPLANAR TFT:
+  the semiconductor is deposited first and the gate is the last metal.
+
+  The 50 nm Al2O3 gate dielectric is a blanket ALD film - it is not drawn,
+  only its openings are (oxetch).  Datatype 10 is a pin purpose and datatype
+  20 a label purpose on the two conductors, so LVS has somewhere to put net
+  names.
+
+  Derived from TFT_P1_V9_02162024.lyp, the layer table the process was drawn
+  with.  Layers 1/0 (mask), 3/0 and 7/0 (dielectrics) of that file are dropped:
+  they are declared there but nothing is ever drawn on them, and they are not
+  masks.  Its layer-7 entry was also malformed - the layer name had been pasted
+  into the <source> string - and "SD conctact" was a typo.
+-->
+<layer-properties>
+ <properties>
+  <frame-color>#008080</frame-color>
+  <fill-color>#008080</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I4</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>igzo.drawing - 4/0</name>
+  <source>4/0@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ffae00</frame-color>
+  <fill-color>#ffae00</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I2</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>sd.drawing - 6/0</name>
+  <source>6/0@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ffae00</frame-color>
+  <fill-color>#ffae00</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I5</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>sd.pin - 6/10</name>
+  <source>6/10@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ffae00</frame-color>
+  <fill-color>#ffae00</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I0</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>sd.label - 6/20</name>
+  <source>6/20@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ff0000</frame-color>
+  <fill-color>#ff0000</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I9</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>oxetch.drawing - 5/0</name>
+  <source>5/0@1</source>
+ </properties>
+ <properties>
+  <frame-color>#808080</frame-color>
+  <fill-color>#808080</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I2</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>gate.drawing - 2/0</name>
+  <source>2/0@1</source>
+ </properties>
+ <properties>
+  <frame-color>#808080</frame-color>
+  <fill-color>#808080</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I5</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>gate.pin - 2/10</name>
+  <source>2/10@1</source>
+ </properties>
+ <properties>
+  <frame-color>#808080</frame-color>
+  <fill-color>#808080</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I0</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>gate.label - 2/20</name>
+  <source>2/20@1</source>
+ </properties>
+ <properties>
+  <frame-color>#ff00ff</frame-color>
+  <fill-color>#ff00ff</fill-color>
+  <frame-brightness>0</frame-brightness>
+  <fill-brightness>0</fill-brightness>
+  <dither-pattern>I9</dither-pattern>
+  <valid>true</valid>
+  <visible>true</visible>
+  <transparent>false</transparent>
+  <marked>false</marked>
+  <xfill>false</xfill>
+  <animation>0</animation>
+  <name>align.drawing - 8/0</name>
+  <source>8/0@1</source>
+ </properties>
+ <name>igzo_mmm_lab</name>
+</layer-properties>

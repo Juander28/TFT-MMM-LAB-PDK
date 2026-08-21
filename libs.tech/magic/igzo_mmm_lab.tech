@@ -1,0 +1,301 @@
+#-----------------------------------------------------------------------------
+# Magic technology file - UCI/INRF IGZO TFT process (igzo_mmm_lab)
+#
+# Top-gate coplanar TFT, four masks, in the order the process runs them:
+#
+#   igzo   4/0   semiconductor island, deposited first
+#   sd     6/0   Au source/drain, directly on the IGZO - the contact IS the
+#                overlap, there is no separate via layer
+#   oxetch 5/0   openings in the blanket 50 nm Al2O3 gate dielectric, over the
+#                S/D probe pads only
+#   gate   2/0   Au gate, last metal, above the dielectric
+#   align  8/0   alignment marks
+#
+# The dielectric has no mask of its own: it is a blanket ALD film.
+#
+# Structure follows gf180mcuD/libs.tech/magic/gf180mcuD.tech (Apache-2.0,
+# GlobalFoundries PDK Authors), reduced to a three-plane stack.
+#
+# Internal units are 10 nm.  Every feature this process draws is a multiple of
+# 0.5 um, so 10 nm is 50x finer than anything on a mask, and it keeps magic's
+# CIF engine fast - the same cell takes about 1 s to write at 10 nm against
+# more than 90 s at 1 nm, since that cost grows as the inverse square of the
+# grid.  The one exception is the legacy Test_mobility structure on the test
+# chip, whose coordinates are not round; it snaps by at most 10 nm.
+#-----------------------------------------------------------------------------
+
+tech
+    igzo_mmm_lab
+end
+
+version
+    version 1.0
+    description "UCI/INRF IGZO TFT, top-gate coplanar, 4 masks"
+end
+
+#-----------------------------------------------------------------------------
+# Planes, bottom of the stack first
+#-----------------------------------------------------------------------------
+planes
+    active,a
+    sd,s
+    gate,g
+    comment,c
+end
+
+#-----------------------------------------------------------------------------
+# Tile types
+#-----------------------------------------------------------------------------
+types
+    active  igzo,semiconductor,i
+    active  tftfet,tft
+    active  sdc,sdcontact
+    sd      sdmet,sdmetal,sdm
+    gate    gatemet,gatemetal,g
+    comment oxetch,dielectric_opening
+    comment align,alignment
+    comment comment
+end
+
+#-----------------------------------------------------------------------------
+# Contacts.  In this process the source/drain contact is simply Au on IGZO -
+# no cut layer, no via.  The overlap itself is the contact.
+#-----------------------------------------------------------------------------
+contact
+    sdc igzo sdmet
+end
+
+#-----------------------------------------------------------------------------
+# The channel is the IGZO covered by the gate.  Painting gate over IGZO makes
+# a transistor, the same way poly over diffusion does in a MOS process.
+#-----------------------------------------------------------------------------
+compose
+    compose tftfet gatemet igzo
+end
+
+#-----------------------------------------------------------------------------
+# Connectivity.  Two conductors, and they are NOT connected to each other:
+# the blanket Al2O3 separates them everywhere, and oxetch only opens it over
+# the probe pads.  The IGZO island is not a connection between source and
+# drain either - it is the device.
+#-----------------------------------------------------------------------------
+connect
+    sdmet,sdc       sdmet,sdc
+    igzo,sdc        igzo,sdc
+    # The channel type holds the gate connection: painting gate over IGZO
+    # turns that tile into tftfet, and without listing it here the gate stripe
+    # would be cut in two where it crosses the island.  Same reason gf180mcu
+    # writes "connect *poly,allfets *poly,allfets".
+    gatemet,tftfet  gatemet,tftfet
+end
+
+#-----------------------------------------------------------------------------
+# Display
+#-----------------------------------------------------------------------------
+styles
+ styletype mos
+    igzo    ndiffusion
+    tftfet  ntransistor ntransistor_stripes
+    sdc     ndiffusion  metal1 contact_X'es
+    sdmet   metal1
+    gatemet polysilicon
+    oxetch  overglass
+    align   comment
+    comment comment
+end
+
+#-----------------------------------------------------------------------------
+# Composition rules for painting
+#-----------------------------------------------------------------------------
+compose
+end
+
+#-----------------------------------------------------------------------------
+# GDS output.  1 nm per internal unit.
+#-----------------------------------------------------------------------------
+cifoutput
+
+style gdsii
+ scalefactor 10 nanometers
+ options calma-permissive-labels
+ gridlimit 1
+
+ layer IGZO igzo,tftfet,sdc
+	labels igzo
+	calma 4 0
+
+ layer SD sdmet,sdc
+	labels sdmet
+	calma 6 0
+
+ layer SDPIN
+	labels sdmet port
+	calma 6 10
+
+ layer OXETCH oxetch
+	calma 5 0
+
+ layer GATE gatemet,tftfet
+	labels gatemet
+	calma 2 0
+
+ layer GATEPIN
+	labels gatemet port
+	calma 2 10
+
+ layer ALIGN align
+	calma 8 0
+
+end
+
+#-----------------------------------------------------------------------------
+# GDS input
+#-----------------------------------------------------------------------------
+cifinput
+
+style import
+ scalefactor 10 nanometers
+ gridlimit 1
+
+ options ignore-unknown-layer-labels
+
+ layer igzo IGZO
+	and-not SD
+	and-not GATE
+	labels IGZO
+
+ layer tftfet IGZO
+	and GATE
+	and-not SD
+
+ layer sdc IGZO
+	and SD
+
+ layer sdmet SD
+	and-not IGZO
+	labels SD
+	labels SDPIN port
+
+ layer gatemet GATE
+	labels GATE
+	labels GATEPIN port
+
+ layer oxetch OXETCH
+
+ layer align ALIGN
+
+ calma IGZO    4 0
+ calma SD      6 0
+ calma SDPIN   6 10
+ calma OXETCH  5 0
+ calma GATE    2 0
+ calma GATEPIN 2 10
+ calma ALIGN   8 0
+
+end
+
+#-----------------------------------------------------------------------------
+# Design rules.  PRELIMINARY - see docs/PDK_GUIDE.md section 5, step 5.  Only
+# rules the measurements actually support are here; values are in nm.
+#-----------------------------------------------------------------------------
+drc
+
+ scalefactor 10
+ cifstyle gdsii
+
+ width igzo 5000 "IGZO island width < 5 um (IGZO.1)"
+ width sdmet 5000 "S/D electrode width < 5 um (SD.1)"
+ width gatemet 5000 "Gate width < 5 um (GATE.1)"
+
+ # The drawn channel length.  Cells drawn at 5 um print at 8 um, so 5 um drawn
+ # is already at the limit of the process, not a comfortable minimum.
+ spacing sdmet,sdc sdmet,sdc 5000 touching_ok \
+	"S/D spacing (drawn channel length) < 5 um (SD.2)"
+
+ spacing gatemet gatemet 5000 touching_ok "Gate spacing < 5 um (GATE.2)"
+
+ # The gate has to reach over both electrodes, or the channel is not gated
+ # along its whole length.  5 um per side is what the test chip draws.
+ surround tftfet gatemet 5000 absence_illegal \
+	"Gate overlap of the channel < 5 um (GATE.3)"
+
+ # The Au has to land on enough semiconductor.  This is a width rule, not an
+ # enclosure rule: the electrodes deliberately run off the island towards the
+ # pads, so "IGZO encloses S/D" is false by design in this process.
+ width sdc 5000 "S/D contact overlap on the IGZO < 5 um (IGZO.2)"
+
+end
+
+#-----------------------------------------------------------------------------
+# Extraction
+#
+# Cox = 1.564 fF/um^2 = 1564 aF/um^2, measured on the 400 x 400 um plate of
+# Test_capacitance.  It appears twice: as the gate capacitance of the channel,
+# and as the overlap capacitance wherever the gate runs over an electrode.
+#-----------------------------------------------------------------------------
+extract
+
+ style ngspice
+ cscale 1
+ lambda 1.0
+ units microns
+ step 100
+ sidehalo 10
+
+ planeorder active  0
+ planeorder sd      1
+ planeorder gate    2
+ planeorder comment 3
+
+ # Film thicknesses: 30 nm IGZO, Au electrodes, 50 nm Al2O3, Au gate.
+ height igzo,tftfet,sdc  0.00  0.03
+ height sdmet            0.03  0.05
+ height gatemet          0.13  0.05
+
+ # Sheet resistance.  2*Rc*W = 6.6e6 Ohm*um of contact resistance dominates
+ # everything else in this process; the Au sheet resistance is negligible and
+ # is entered as a small non-zero value so extraction does not divide by zero.
+ resist gatemet    50
+ resist sdmet      50
+ resist igzo,tftfet 1000000
+
+ # Gate capacitance to the plate below it.
+ areacap  tftfet     1564
+ overlap  gatemet    sdmet    1564
+ overlap  gatemet    sdc      1564
+ perimc   gatemet    sdmet    0
+
+ # The device.  Its terminals are the two contacted ends of the island.
+ #
+ # There is no substrate - a TFT sits on glass - so the fourth pin is named
+ # GND and carries no current: the igzo_tft subcircuit in
+ # libs.tech/ngspice/design.ngspice ties the intrinsic bulk to its own source
+ # and holds b through a 1 Tohm resistor.  Tie the B pin of the symbol to GND
+ # in schematics, and layout and schematic will agree pin for pin.
+ #
+ # A NOTE ON THE EXTRACTED WIDTH.  l comes out exactly right - it is the gap
+ # between the electrodes.  w does not: the extractor measures the gated
+ # island, and the island is drawn 5 um past each electrode end for alignment
+ # margin (110 um of island for a 100 um device on the test chip).  That
+ # overhang is gated but carries no source-to-drain current, so the drawn
+ # device width is the electrode length, not the island height.  Expect
+ # extraction to report roughly 13 % more; libs.tech/netgen/setup.tcl allows
+ # for it.  Drawing the island flush with the electrodes makes it exact.
+ device msubcircuit igzo_tft tftfet sdc,igzo sdc,igzo space GND l=l w=w
+
+end
+
+#-----------------------------------------------------------------------------
+# Wiring and routing are not used: this PDK has no router support.
+#-----------------------------------------------------------------------------
+wiring
+end
+
+router
+end
+
+plowing
+end
+
+mzrouter
+end

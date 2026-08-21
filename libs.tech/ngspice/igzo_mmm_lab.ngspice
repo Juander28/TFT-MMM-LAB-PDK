@@ -1,0 +1,80 @@
+* ==========================================================================
+* IGZO TFT compact models - UCI/INRF process (igzo_mmm_lab)
+*
+* Corner sections.  Pick one with
+*     .lib <path>/igzo_mmm_lab.ngspice tt
+* and get the device wrappers with
+*     .include <path>/design.ngspice
+* Every section defines the same model name, IGZO_TFT, so a netlist never
+* changes when the corner does.
+*
+*   tt      typical: median over every working device of the best chip
+*   best    long-channel devices of the best chip (L >= 40 um), not
+*           contact-limited - linear and saturation extractions agree
+*   short   L <= 10 um: contact-limited, Kp collapses.  Prefer the tt corner
+*           with the igzo_tft wrapper, which carries the measured contact
+*           resistance explicitly instead of hiding it in Kp
+*   all     across all three chips, including the bad ones - worst case
+*
+* SOURCE DATA
+*   TFT/TFT{1,2,3}/VDS/*.xls   output curves, VDS 0 -> 10 V
+*   TFT/test/*.xls             transfer sweeps, VDS = 0.1 / 1 / 2 V
+*   extracted by docs/extraction/extract_params.py on 2026-08-19; the linear
+*   and saturation routes agree to 0.5 % on long-channel devices
+*
+* GATE DIELECTRIC: 50 nm Al2O3 (ALD), blanket, eps_r = 8.83.
+*   MEASURED: the 400 x 400 um crossing of Test_capacitance reads 250.2 pF, so
+*     Cox = 156.4 nF/cm^2 = 1.564 fF/um^2 = 1.564e-3 F/m^2.
+*   TOX below is the SiO2-EQUIVALENT thickness (22.1 nm), because SPICE
+*   level 1 assumes eps_ox = 3.9 when it turns TOX into capacitance.
+*   Implied mobility mu = Kp/Cox = 4.6 cm^2/Vs.
+*
+* Vto is near zero and slightly negative on many devices (depletion-like),
+* which is normal for unpassivated IGZO.
+*
+* CGSO/CGDO ARE ZERO HERE ON PURPOSE.  The overlap capacitance is not a
+* property of the process alone - it is Cox times the drawn gate overlap - so
+* the igzo_tft wrapper in design.ngspice puts it in as explicit capacitors
+* that track the `ov` parameter.  Leaving it in the model as well would count
+* it twice, and would freeze it at the 5 um overlap of the test chip, which is
+* exactly the number a redesign has to be able to move.
+*
+* LIMITS - the models are DC-validated only:
+*   1. Validated against measured output curves at each device's own W and L:
+*      median sim/meas = 1.01, all 18 comparisons within 1.5x
+*      (docs/extraction/validate_model.py).
+*   2. No AC validation.  Cox is measured, but the overlap capacitance rests
+*      on a 5 um overlap read off one GDS cell, and nothing here was checked
+*      against a measured C-V or S-parameter.
+*   3. Level 1 imposes a square law.  The measured saturation exponent is
+*      gamma = 2.31 (TFT1 median), 2.44 for L >= 40 um, so the model is about
+*      20 % pessimistic on gm at a given current.
+*   4. Validated range: VGS <= 6 V, VDS <= 10 V.  Above that it is
+*      extrapolation, not prediction.
+*   5. TFT2 is not represented: its saturation exponent comes out at 0.87,
+*      which no square-law model can express.  That chip is anomalous.
+* ==========================================================================
+
+* --- typical ---------------------------------------------------------------
+.lib tt
+.model IGZO_TFT NMOS (Level=1 Vto=-0.26 Kp=0.562u Lambda=0.0142
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
+.endl tt
+
+* --- best case -------------------------------------------------------------
+.lib best
+.model IGZO_TFT NMOS (Level=1 Vto=0.09 Kp=0.717u Lambda=0.0067
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
+.endl best
+
+* --- short channel, contact-limited ----------------------------------------
+.lib short
+.model IGZO_TFT NMOS (Level=1 Vto=-1.32 Kp=0.128u Lambda=0.0659
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
+.endl short
+
+* --- worst case over all three chips ---------------------------------------
+.lib all
+.model IGZO_TFT NMOS (Level=1 Vto=-0.53 Kp=0.381u Lambda=0.0355
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
+.endl all

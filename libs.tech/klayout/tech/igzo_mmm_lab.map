@@ -1,0 +1,16 @@
+# Stream layer map for the UCI/INRF IGZO TFT process (igzo_mmm_lab).
+#
+# Four masks plus alignment, listed in process order (bottom of the stack
+# first).  The 50 nm Al2O3 gate dielectric is a blanket ALD film and has no
+# mask of its own; only its openings are drawn, on oxetch.
+#
+# name     purposes                  layer datatype
+igzo       drawing                     4     0
+sd         drawing                     6     0
+sd         PIN,NET,SPNET               6    10
+sd         LABEL                       6    20
+oxetch     drawing                     5     0
+gate       drawing                     2     0
+gate       PIN,NET,SPNET               2    10
+gate       LABEL                       2    20
+align      drawing                     8     0

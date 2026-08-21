@@ -1,0 +1,30 @@
+magic
+tech igzo_mmm_lab
+timestamp 1615919903
+<< checkpaint >>
+rect -14250 -4500 14250 4500
+<< igzo >>
+rect -5000 2500 -4500 3000
+rect 4500 2500 5000 3000
+rect -5000 -3000 -4500 -2500
+rect 4500 -3000 5000 -2500
+<< tftfet >>
+rect -4500 2500 4500 3000
+rect -4000 -2500 4000 2500
+rect -4500 -3000 4500 -2500
+<< sdc >>
+rect -5000 -2500 -4000 2500
+rect 4000 -2500 5000 2500
+<< sdmet >>
+rect -13750 -2500 -5000 2500
+rect 5000 -2500 13750 2500
+<< gatemet >>
+rect -4500 -4000 4500 4000
+<< labels >>
+rlabel sdmet s -9125 -250 -8625 250 4 S
+port 3 nsew
+rlabel sdmet s 8625 -250 9125 250 4 D
+port 5 nsew
+rlabel gatemet s -250 3250 250 3750 4 G
+port 7 nsew
+<< end >>

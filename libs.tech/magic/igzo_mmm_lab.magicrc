@@ -1,0 +1,46 @@
+puts stdout "Sourcing design .magicrc for technology igzo_mmm_lab ..."
+
+# Internal units are 10 nm.  Every drawn feature is a multiple of 0.5 um, so
+# this is 50x finer than any mask feature and keeps GDS writes fast.
+set scalefac [tech lambda]
+if {[lindex $scalefac 1] != 1} {
+    scalegrid 1 1
+}
+
+drc euclidean on
+# Fixed seed keeps GDS writes reproducible
+catch {random seed 12345}
+
+# Allow the PDK path to come from the environment
+if {[catch {set PDK_ROOT [file nativename $env(PDK_ROOT)]}]} {
+    set PDK_ROOT /foss/pdks
+}
+if {[catch {set PDK [file nativename $env(PDK)]}]} {
+    set PDK TFT-MMM-LAB-PDK
+}
+set IGZO_PDK_PATH ${PDK_ROOT}/${PDK}
+
+# loading technology
+tech load ${IGZO_PDK_PATH}/libs.tech/magic/igzo_mmm_lab.tech
+
+# halt on error
+if {[tech name] != "igzo_mmm_lab"} {
+    puts stderr "ERROR: technology igzo_mmm_lab did not load - check PDK_ROOT and PDK"
+    quit -noprompt
+}
+
+# There is no substrate in this process: a TFT sits on glass.  The b pin of
+# igzo_tft is inert; see libs.tech/ngspice/design.ngspice.
+set VDD VDD
+set GND GND
+set SUB GND
+
+# add path to the reference cells
+if {[catch {set MAGTYPE $env(MAGTYPE)}]} {
+   set MAGTYPE mag
+}
+addpath ${IGZO_PDK_PATH}/libs.ref/igzo_mmm_lab_pr/${MAGTYPE}
+
+# The sak-*/iic-* helper scripts look for $PDK.magicrc, so this file is
+# installed under both names by install.sh.
+puts stdout "igzo_mmm_lab: PDK at ${IGZO_PDK_PATH}"

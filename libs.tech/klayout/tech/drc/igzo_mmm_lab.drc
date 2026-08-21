@@ -1,0 +1,104 @@
+#
+# PRELIMINARY design-rule deck - UCI/INRF IGZO TFT process (igzo_mmm_lab)
+#
+# Run it with:
+#
+#     klayout -b -r igzo_mmm_lab.drc -rd input=<layout.gds> -rd report=<out.lyrdb>
+#
+# or through drc/run_drc.py, which is the wrapper the flow scripts call.
+#
+# HOW MUCH TO TRUST THIS.  Every number here is either measured or read off the
+# test chip; nothing is a guess dressed up as a rule, and nothing came from a
+# foundry document, because there is none.  In particular:
+#
+#   * 5 um is the minimum drawn dimension because the smallest device drawn on
+#     the test chip is 5 um and it prints at 8 um.  So 5 um drawn is the edge
+#     of what the process has been shown to do, not a comfortable minimum.
+#   * The gate overlap rule is 5 um because that is what the working devices
+#     are drawn with.  It is a large overlap and it is the dominant parasitic;
+#     a self-aligned process would remove the rule rather than tighten it.
+#   * There is no rule for anything that has not been fabricated.  Density,
+#     antenna, latch-up and fill have no meaning in a four-mask TFT process.
+#
+# Structure follows gf180mcuD/libs.tech/klayout/tech/drc/ (Apache-2.0,
+# GlobalFoundries PDK Authors).
+#
+
+# --- setup -------------------------------------------------------------------
+if $input
+  if $topcell
+    source($input, $topcell)
+  else
+    source($input)
+  end
+end
+
+if $report
+  report("igzo_mmm_lab DRC", $report)
+else
+  report("igzo_mmm_lab DRC")
+end
+
+if $thr
+  threads($thr.to_i)
+else
+  threads(4)
+end
+
+verbose(true) if $verbose == "true"
+
+# --- layers ------------------------------------------------------------------
+igzo    = input(4, 0)
+sd      = input(6, 0)
+oxetch  = input(5, 0)
+gate    = input(2, 0)
+align   = input(8, 0)
+
+# The channel: IGZO covered by the gate and not covered by an electrode.
+channel = igzo & gate - sd
+# The source/drain contact: Au directly on IGZO, no via layer in this process.
+sdcon   = igzo & sd
+# Where the gate runs over an electrode - the overlap that sets the parasitic.
+gate_ov = gate & sd
+
+# --- minimum drawn dimensions ------------------------------------------------
+igzo.width(5.um).output(
+  "IGZO.1", "IGZO island width < 5 um (smallest drawn feature on the test chip)")
+sd.width(5.um).output(
+  "SD.1", "S/D electrode width < 5 um")
+gate.width(5.um).output(
+  "GATE.1", "Gate width < 5 um")
+
+# --- spacings ----------------------------------------------------------------
+# S/D spacing IS the drawn channel length: 5 um drawn prints at 8 um.
+sd.space(5.um).output(
+  "SD.2", "S/D spacing (drawn channel length) < 5 um")
+gate.space(5.um).output(
+  "GATE.2", "Gate spacing < 5 um")
+igzo.space(5.um).output(
+  "IGZO.3", "IGZO island spacing < 5 um")
+
+# --- the device ---------------------------------------------------------------
+# The gate must reach over both electrodes, or part of the channel is ungated.
+gate_ov.width(5.um).output(
+  "GATE.3", "Gate overlap of the S/D electrode < 5 um per side")
+# The Au has to land on enough semiconductor.  Note what is NOT checked here:
+# an enclosure rule.  The electrodes deliberately run off the island on their
+# way to the pads, so "IGZO encloses S/D" is false by design in this process -
+# writing that rule flags every working device.  What can be checked is how
+# far the Au and the IGZO overlap, which is 10 um on the test chip.
+sdcon.width(5.um).output(
+  "IGZO.2", "S/D contact overlap on the IGZO < 5 um")
+
+# --- dielectric openings ------------------------------------------------------
+# The window in the blanket Al2O3 has to stay inside the pad it opens, with
+# margin: 400 x 400 um pads carry 360 x 360 um windows on the test chip.
+oxetch.not_inside(sd).output(
+  "OX.1", "Dielectric opening outside the S/D metal it exposes")
+oxetch.enclosed(sd, 20.um).output(
+  "OX.2", "S/D enclosure of the dielectric opening < 20 um")
+# An opening over the gate would short a probe to the gate metal.
+(oxetch & gate).output(
+  "OX.3", "Dielectric opening over the gate metal")
+
+align.output("ALIGN.info", "Alignment marks (informational, not a violation)") if $keep_align
