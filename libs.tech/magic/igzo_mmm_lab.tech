@@ -294,11 +294,18 @@ extract
  height sdmet            0.03  0.05
  height gatemet          0.13  0.05
 
- # Sheet resistance.  2*Rc*W = 6.6e6 Ohm*um of contact resistance dominates
- # everything else in this process; the Au sheet resistance is negligible and
- # is entered as a small non-zero value so extraction does not divide by zero.
- resist gatemet    50
- resist sdmet      50
+ # Sheet resistance, in milliohms per square.
+ #
+ # Gold at the assumed 50 nm: rho/t = 2.44e-8 / 50e-9 = 0.488 Ohm/sq = 488.
+ # THIS NUMBER MOVES WITH THE METAL THICKNESS, which nobody has measured - at
+ # 1 um of gold it would be 24.4 instead.  Anything extracted from it is only
+ # as good as that assumption; the same caveat is on the ind_igzo cell.
+ resist gatemet    488
+ resist sdmet      488
+ # The gated island: 2*Rc*W = 6.6e6 Ohm*um of contact resistance dominates
+ # everything the channel itself does, and the igzo_tft subcircuit carries it
+ # explicitly.  This is a placeholder that keeps the extractor from dividing by
+ # zero on the semiconductor, not a measurement.
  resist igzo,tftfet 1000000
 
  # Gate capacitance to the plate below it.

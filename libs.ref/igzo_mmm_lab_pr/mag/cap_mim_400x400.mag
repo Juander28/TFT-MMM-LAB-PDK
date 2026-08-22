@@ -1,12 +1,12 @@
 magic
 tech igzo_mmm_lab
-timestamp 1615964164
+timestamp 1616032767
 << checkpaint >>
-rect -40500 -40500 40500 20500
+rect -20500 -40500 40500 20500
 << sdmet >>
 rect -20000 -40000 20000 20000
 << gatemet >>
-rect -40000 -20000 40000 20000
+rect -20000 -20000 40000 20000
 << oxetch >>
 rect -18000 -38000 18000 -22000
 << labels >>

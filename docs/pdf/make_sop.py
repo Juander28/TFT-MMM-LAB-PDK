@@ -51,7 +51,12 @@ def _cap_rows(src):
         ["w, l", "400 um", "plate, used in 'by dimensions'", src["d"]],
         ["area_target", "160000 um^2", "used in 'by area' - square plate", src["d"]],
         ["c_target", "250240 fF", "used in 'by capacitance' - square plate", src["d"]],
-        ["ext", "200 um", "how far each plate runs past the crossing", src["d"]],
+        ["ext_sd", "200 um", "S/D plate past the crossing, terminal side", src["d"]],
+        ["ext_gate", "200 um", "gate plate past the crossing, terminal side", src["d"]],
+        ["ext_sd_far", "0", "S/D plate past the crossing, opposite side", src["d"]],
+        ["ext_gate_far", "0", "gate plate past the crossing, opposite side", src["d"]],
+        ["pad", "off", "probe pad on the end of each plate", src["d"]],
+        ["pad_size", "400 um", "pad side", src["c"]],
         ["etch_inset", "20 um", "window inset in the lower plate's tail", src["c"]],
         ["show_value", "on", "print the capacitance on layer 63/0", src["d"]],
         ["area, c", "read-only", "always Cox * W * L, Cox = 1.564 fF/um^2", src["m"]],
@@ -71,6 +76,9 @@ def _ind_rows(src):
         ["t_metal", "0.05 um", "metal thickness - the lever on R", src["a"]],
         ["f_eval", "100 MHz", "frequency the R_ac and Q read-outs use", src["d"]],
         ["lead", "40 um", "terminal lead length", src["d"]],
+        ["pad", "off", "probe pad on each terminal", src["d"]],
+        ["pad_size", "200 um", "pad side", src["d"]],
+        ["lbl", "on", "pins and labels A and B - needed for extraction", src["d"]],
         ["l_series", "read-only", "Mohan-Wheeler (series) or coupled rings", "-"],
         ["r_dc, r_ac", "read-only", "from the drawn track length and rho_Au", "-"],
         ["q, d_out, wire_len", "read-only", "Q at f_eval, outer size, track length", "-"],
@@ -360,6 +368,117 @@ ES = {
 }
 
 
+EXTRA_EN = {
+    "h": "Extraction, parasitics and LVS",
+    "q1": "Can a netlist be extracted from layout, and LVS'd with netgen?",
+    "a1":
+        "Yes, and both are checked on every run of scripts/run_checks.sh.\n\n"
+        "    magic -rcfile $PDKPATH/libs.tech/magic/igzo_mmm_lab.magicrc\n"
+        "    load <cell> ; extract all ; ext2spice lvs ; ext2spice\n"
+        "    netgen -batch lvs \"layout.spice cell\" \"schematic.spice cell\" \\\n"
+        "                     $PDKPATH/libs.tech/netgen/setup.tcl\n\n"
+        "The transistor extracts as an igzo_tft subcircuit with the L you drew\n"
+        "and pins in D G S order, and LVS against the xschem netlist matches\n"
+        "uniquely.  The capacitor extracts as a capacitance between its two\n"
+        "ports.  The inductor does not extract as a device at all - see below.",
+    "q2": "Can parasitic capacitance be extracted?",
+    "a2":
+        "Yes, and it is exact for this process because there is only one\n"
+        "dielectric to know about:\n\n"
+        "    ext2spice cthresh 0        (0 = keep every capacitance)\n\n"
+        "Drawn 40.36 pF, extracted 40.3593 pF; drawn 250.24 pF, extracted\n"
+        "0.25024 nF.  The same number appears wherever gate metal happens to\n"
+        "run over S/D metal in a design, which is the parasitic worth having:\n"
+        "at 1.564 fF/um^2 a crossing is not free.\n\n"
+        "There is no substrate capacitance in this technology and the PDK does\n"
+        "not invent one.  A TFT sits on glass; there is nothing underneath to\n"
+        "couple to.",
+    "q3": "Can parasitic resistance be extracted?",
+    "a3":
+        "Partly, and this is where the honest answer is longer than yes.\n\n"
+        "The techfile carries the sheet resistance - 488 mOhm/square, which is\n"
+        "gold at the assumed 50 nm - so anything that uses it gets the right\n"
+        "number, and run_checks.sh asserts that it agrees with what the coil\n"
+        "cell reports: 774 squares x 0.488 = 377.7 Ohm, which is what ind_igzo\n"
+        "prints on itself.  Change the thickness and both move together.\n\n"
+        "What does not work is magic's extresist pipeline.  On a coil it warns\n"
+        "that the two ports are electrically shorted - which is true, a coil is\n"
+        "a short at DC - and then crashes; on simpler shapes it produces no\n"
+        "output.  So interconnect resistance in this PDK comes from the cell\n"
+        "estimate and from the sheet resistance, not from extresist.  If you\n"
+        "need it per-net on a real block, the route is squares x 0.488 Ohm on\n"
+        "the geometry, not magic.",
+    "h_ind": "What this means for an inductor in LVS",
+    "ind":
+        "A coil extracts as one net: its two terminals are the same piece of\n"
+        "metal.  Nothing in the layout says 'inductor', because nothing in the\n"
+        "layout is one - it is a wire whose shape happens to store energy.\n\n"
+        "So an ind_igzo instance in a schematic will not match an extracted\n"
+        "coil pin for pin.  Treat the coil as a black box for LVS: keep it as a\n"
+        "fixed cell, compare the block around it, and check the coil itself by\n"
+        "geometry - which is what the connectivity check in run_checks.sh does,\n"
+        "after an inner ring was once left floating by a bus that started in\n"
+        "the wrong place and nothing noticed.",
+}
+
+EXTRA_ES = {
+    "h": "Extraccion, parasitos y LVS",
+    "q1": "Se puede extraer netlist del layout y hacer LVS con netgen?",
+    "a1":
+        "Si, y las dos cosas se comprueban en cada corrida de\n"
+        "scripts/run_checks.sh.\n\n"
+        "    magic -rcfile $PDKPATH/libs.tech/magic/igzo_mmm_lab.magicrc\n"
+        "    load <celda> ; extract all ; ext2spice lvs ; ext2spice\n"
+        "    netgen -batch lvs \"layout.spice celda\" \"esquematico.spice celda\" \\\n"
+        "                     $PDKPATH/libs.tech/netgen/setup.tcl\n\n"
+        "El transistor sale como un subcircuito igzo_tft con la L que\n"
+        "dibujaste y los pines en orden D G S, y el LVS contra el netlist de\n"
+        "xschem cuadra de forma unica.  El capacitor sale como una capacitancia\n"
+        "entre sus dos puertos.  El inductor no sale como dispositivo - ver\n"
+        "abajo.",
+    "q2": "Se puede extraer capacitancia parasita?",
+    "a2":
+        "Si, y en este proceso sale exacta porque solo hay un dielectrico que\n"
+        "conocer:\n\n"
+        "    ext2spice cthresh 0        (0 = conserva todas las capacitancias)\n\n"
+        "Dibujados 40.36 pF, extraidos 40.3593 pF; dibujados 250.24 pF,\n"
+        "extraidos 0.25024 nF.  El mismo numero aparece donde sea que el metal\n"
+        "de compuerta cruce por encima del de S/D, que es el parasito que vale\n"
+        "la pena tener: a 1.564 fF/um^2 un cruce no es gratis.\n\n"
+        "No hay capacitancia al sustrato en esta tecnologia y el PDK no se la\n"
+        "inventa.  Un TFT esta sobre vidrio; no hay nada debajo con que\n"
+        "acoplarse.",
+    "q3": "Se puede extraer resistencia parasita?",
+    "a3":
+        "En parte, y aqui la respuesta honesta es mas larga que un si.\n\n"
+        "El techfile lleva la resistencia de hoja - 488 mOhm/cuadro, que es oro\n"
+        "con los 50 nm supuestos - asi que lo que la use obtiene el numero\n"
+        "correcto, y run_checks.sh verifica que coincide con lo que reporta la\n"
+        "celda de la bobina: 774 cuadros x 0.488 = 377.7 Ohm, que es lo que\n"
+        "ind_igzo escribe sobre si misma.  Cambia el espesor y las dos se\n"
+        "mueven juntas.\n\n"
+        "Lo que no funciona es el flujo extresist de magic.  En una bobina\n"
+        "avisa que los dos puertos estan en corto - lo cual es cierto, una\n"
+        "bobina es un corto en DC - y luego se cae; en formas mas simples no\n"
+        "produce salida.  Asi que la resistencia de interconexion en este PDK\n"
+        "sale de la estimacion de la celda y de la resistencia de hoja, no de\n"
+        "extresist.  Si la necesitas por red en un bloque real, el camino es\n"
+        "cuadros x 0.488 Ohm sobre la geometria, no magic.",
+    "h_ind": "Que significa esto para un inductor en LVS",
+    "ind":
+        "Una bobina extrae como una sola red: sus dos terminales son el mismo\n"
+        "pedazo de metal.  Nada en el layout dice 'inductor', porque nada en el\n"
+        "layout lo es - es un cable cuya forma resulta almacenar energia.\n\n"
+        "Asi que una instancia de ind_igzo en un esquematico no va a cuadrar\n"
+        "pin a pin con una bobina extraida.  Trata la bobina como caja negra en\n"
+        "el LVS: dejala como celda fija, compara el bloque alrededor, y revisa\n"
+        "la bobina por geometria - que es lo que hace la comprobacion de\n"
+        "conectividad de run_checks.sh, despues de que un anillo interno quedara\n"
+        "flotando por un bus que empezaba en el lugar equivocado sin que nadie\n"
+        "lo notara.",
+}
+
+
 def build(lang, out_dir=None):
     S = {"en": EN, "es": ES}[lang]
     src = EN_SRC if lang == "en" else ES_SRC
@@ -432,6 +551,23 @@ def build(lang, out_dir=None):
         p.image("xschem_tank.png",
                 {"en": "tests/tank_ac.sch - the three cells together.",
                  "es": "tests/tank_ac.sch - las tres celdas juntas."}[lang], width=0.95)
+        p.close(n)
+
+        n += 1
+        X = EXTRA_EN if lang == "en" else EXTRA_ES
+        p = Page(pdf, X["h"], kicker=S["k"], footer=S["footer"])
+        p.head(X["q1"])
+        p.text(X["a1"])
+        p.head(X["q2"])
+        p.text(X["a2"])
+        p.close(n)
+
+        n += 1
+        p = Page(pdf, X["h"], kicker=S["k"], footer=S["footer"])
+        p.head(X["q3"])
+        p.text(X["a3"])
+        p.head(X["h_ind"])
+        p.text(X["ind"])
         p.close(n)
 
         n += 1

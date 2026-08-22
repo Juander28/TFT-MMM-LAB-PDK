@@ -83,6 +83,15 @@ def main():
          "w": 20.0, "gap": 10.0})
     count += 1
 
+    # The same two cells with probe pads, so the option is exercised by the
+    # library and not only by the parameter dialog.
+    add(layout, lib, "cap_mim", "cap_mim_40p36_pad",
+        {"mode": "by capacitance", "c_target": 40362.0, "pad": True,
+         "lbl": True})
+    add(layout, lib, "ind_igzo", "ind_igzo_square_series_pad",
+        {"shape": "square", "topology": "series", "pad": True})
+    count += 2
+
     out = os.path.join(ROOT, "libs.ref", "igzo_mmm_lab_pr", "gds",
                        "tft_primitives.gds")
     layout.write(out)

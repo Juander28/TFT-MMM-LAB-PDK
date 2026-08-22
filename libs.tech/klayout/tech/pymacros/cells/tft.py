@@ -155,8 +155,17 @@ class cap_mim(pya.PCellDeclarationHelper):
         self.param("c_target", self.TypeDouble, "Capacitance (by capacitance)",
                    default=COX_AREA * TFT_PAD * TFT_PAD, unit="fF")
 
-        self.param("ext", self.TypeDouble, "Plate Extension",
+        self.param("ext_sd", self.TypeDouble, "S/D plate extension (terminal)",
                    default=200.0, unit="um")
+        self.param("ext_gate", self.TypeDouble, "Gate plate extension (terminal)",
+                   default=200.0, unit="um")
+        self.param("ext_sd_far", self.TypeDouble, "S/D plate extension (far side)",
+                   default=0.0, unit="um")
+        self.param("ext_gate_far", self.TypeDouble, "Gate plate extension (far side)",
+                   default=0.0, unit="um")
+        self.param("pad", self.TypeBoolean, "Probe pads", default=False)
+        self.param("pad_size", self.TypeDouble, "Pad size",
+                   default=TFT_PAD, unit="um")
         self.param("etch_inset", self.TypeDouble, "Dielectric Window Inset",
                    default=TFT_ETCH_INSET, unit="um")
         self.param("show_value", self.TypeBoolean, "Print the value on the cell",
@@ -172,18 +181,25 @@ class cap_mim(pya.PCellDeclarationHelper):
         return "cap_mim(%s)" % _format_c(COX_AREA * self.w * self.l)
 
     def coerce_parameters_impl(self):
-        # Snapped to a 10 nm grid: half of it is then a whole number of
-        # nanometres, so insetting the etch window by an exact 20 um stays an
-        # exact 20 um instead of rounding to 19.999 and failing its own rule.
-        if self.mode == "by area":
-            side = math.sqrt(max(1.0, self.area_target))
-            self.w = self.l = round(side, 2)
-        elif self.mode == "by capacitance":
-            side = math.sqrt(max(1.0, self.c_target) / COX_AREA)
-            self.w = self.l = round(side, 2)
+        # Snapped to a 20 nm grid, so that HALF the side lands on magic's 10 nm
+        # internal grid.  Two things break otherwise, and both are quiet: the
+        # etch window's 20 um inset rounds to 19.999 and fails its own DRC
+        # rule, and magic rescales the whole cell (magscale 1 10) to fit the
+        # off-grid geometry, after which the extracted capacitance is wrong by
+        # a factor nobody notices.
+        if self.mode in ("by area", "by capacitance"):
+            if self.mode == "by area":
+                side = math.sqrt(max(1.0, self.area_target))
+            else:
+                side = math.sqrt(max(1.0, self.c_target) / COX_AREA)
+            self.w = self.l = round(side / 0.02) * 0.02
         else:
             self.w = max(1.0, self.w)
             self.l = max(1.0, self.l)
+        self.ext_sd = max(0.0, self.ext_sd)
+        self.ext_gate = max(0.0, self.ext_gate)
+        self.ext_sd_far = max(0.0, self.ext_sd_far)
+        self.ext_gate_far = max(0.0, self.ext_gate_far)
 
         self.area = self.w * self.l
         self.c = COX_AREA * self.area
@@ -194,6 +210,9 @@ class cap_mim(pya.PCellDeclarationHelper):
 
     def produce_impl(self):
         text = _format_c(self.c) if self.show_value else None
-        draw_cap_mim(self.cell, w=self.w, l=self.l, ext=self.ext,
-                     etch_inset=self.etch_inset, lbl=self.lbl,
+        draw_cap_mim(self.cell, w=self.w, l=self.l,
+                     ext_sd=self.ext_sd, ext_gate=self.ext_gate,
+                     ext_sd_far=self.ext_sd_far, ext_gate_far=self.ext_gate_far,
+                     etch_inset=self.etch_inset, pad=self.pad,
+                     pad_size=self.pad_size, lbl=self.lbl,
                      value_text=("cap_mim %s" % text) if text else None)

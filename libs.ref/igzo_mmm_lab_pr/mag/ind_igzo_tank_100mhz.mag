@@ -1,6 +1,6 @@
 magic
 tech igzo_mmm_lab
-timestamp 1615964164
+timestamp 1616032767
 << checkpaint >>
 rect -75000 -75500 73500 67500
 << sdmet >>
@@ -93,5 +93,9 @@ rect -70000 -70000 70000 -68000
 rect -74000 -1000 -72000 1000
 rect -20500 -500 -19500 500
 << labels >>
+rlabel gatemet s 70000 -1000 72000 1000 4 A
+port 3 nsew
+rlabel gatemet s -74000 -1000 -72000 1000 4 B
+port 5 nsew
 rlabel text s 0 -75000 0 -75000 4 ind_igzo 263.5nH / 1.439kOhm @ 100MHz / Q 0.12
 << end >>

@@ -1,31 +1,30 @@
 magic
 tech igzo_mmm_lab
-magscale 1 2
-timestamp 1615964164
+timestamp 1616032767
 << checkpaint >>
-rect -21000 -14000 21000 14000
+rect -10500 -7000 10500 7000
 << igzo >>
-rect -2500 10000 -1500 11000
-rect 1500 10000 2500 11000
-rect -2500 -11000 -1500 -10000
-rect 1500 -11000 2500 -10000
+rect -1250 5000 -750 5500
+rect 750 5000 1250 5500
+rect -1250 -5500 -750 -5000
+rect 750 -5500 1250 -5000
 << tftfet >>
-rect -1500 10000 1500 11000
-rect -500 -10000 500 10000
-rect -1500 -11000 1500 -10000
+rect -750 5000 750 5500
+rect -250 -5000 250 5000
+rect -750 -5500 750 -5000
 << sdc >>
-rect -2500 -10000 -500 10000
-rect 500 -10000 2500 10000
+rect -1250 -5000 -250 5000
+rect 250 -5000 1250 5000
 << sdmet >>
-rect -20000 -10000 -2500 10000
-rect 2500 -10000 20000 10000
+rect -10000 -5000 -1250 5000
+rect 1250 -5000 10000 5000
 << gatemet >>
-rect -1500 -13000 1500 13000
+rect -750 -6500 750 6500
 << labels >>
-rlabel sdmet s -11225 -975 -9275 975 4 S
+rlabel sdmet s -5613 -488 -4637 488 4 S
 port 3 nsew
-rlabel sdmet s 9275 -975 11225 975 4 D
+rlabel sdmet s 4637 -488 5613 488 4 D
 port 5 nsew
-rlabel gatemet s -975 11025 975 12975 4 G
+rlabel gatemet s -488 5512 488 6488 4 G
 port 7 nsew
 << end >>

@@ -17,6 +17,8 @@
 #   9. klayout  - the inductor's estimate matches coil_core called directly
 #  10. magic    - a dielectric opening under gate metal really is a via
 #  11. ngspice  - TFT, capacitor and inductor together resonate where they should
+#      (plus a connectivity check on the passives, after an inner ring was
+#       once left floating by a bus that started in the wrong place)
 #
 # Exits non-zero on the first failure.
 set -e
@@ -209,6 +211,109 @@ KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" PDKPATH="${PDKPATH}
     && grep -q "matches coil_core" "${WORK}/ind.log" \
     && pass "klayout ind_igzo: $(grep -o 'ind_igzo: .*' "${WORK}/ind.log")" \
     || { cat "${WORK}/ind.log"; fail "ind_igzo estimate"; }
+
+# --- 9b. every passive is one connected piece --------------------------------
+cat > "${WORK}/conn.py" <<'PY'
+import pya
+lib = pya.Library.library_by_name("igzo_mmm_lab_pr")
+
+def pieces(pcell, params, layer):
+    decl = lib.layout().pcell_declaration(pcell)
+    ly = pya.Layout(); ly.dbu = 0.001
+    cell = ly.cell(ly.add_pcell_variant(lib, decl.id(), params))
+    return pya.Region(cell.begin_shapes_rec(ly.layer(pya.LayerInfo(*layer)))).merged().count()
+
+# Parallel rings: every ring has to reach both buses.  This is the check that
+# was missing when the innermost circular ring sat there disconnected - the
+# coil looked right and measured wrong.
+for shape in ("square", "circular"):
+    n = pieces("ind_igzo", {"shape": shape, "topology": "parallel"}, (2, 0))
+    assert n == 1, "%s parallel rings: %d disconnected pieces on gate" % (shape, n)
+
+# A series spiral is two pieces on its own metal by construction: the coil, and
+# the far terminal's pad, which reaches the coil through the underpass on the
+# other metal.  Three would mean something fell off.
+for shape in ("square", "circular"):
+    n = pieces("ind_igzo", {"shape": shape, "topology": "series"}, (2, 0))
+    assert n == 2, "%s spiral: %d pieces on gate, expected 2" % (shape, n)
+    n = pieces("ind_igzo", {"shape": shape, "topology": "series"}, (6, 0))
+    assert n == 1, "%s spiral: underpass in %d pieces" % (shape, n)
+
+# The capacitor's plates are one piece each, extensions and pads included.
+for params in ({}, {"pad": True}, {"ext_sd_far": 100.0, "ext_gate_far": 100.0}):
+    for layer, what in (((2, 0), "gate plate"), ((6, 0), "S/D plate")):
+        n = pieces("cap_mim", params, layer)
+        assert n == 1, "cap_mim %s: %s in %d pieces" % (params, what, n)
+print("every passive is connected the way it is meant to be")
+PY
+KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" \
+    "${KLAYOUT}" -z -nc -r "${WORK}/conn.py" > "${WORK}/conn.log" 2>&1 \
+    && grep -q "connected the way" "${WORK}/conn.log" \
+    && pass "klayout: the passives are connected, rings included" \
+    || { cat "${WORK}/conn.log"; fail "passive connectivity"; }
+
+# --- 9c. the sheet resistance in magic and in the cell agree -----------------
+# The coil's resistance comes from coil_core; magic's comes from the "resist"
+# line in the techfile.  They are two statements about the same gold, and if
+# they drift apart one of them is lying.  Both are functions of a metal
+# thickness nobody has measured, so they can be wrong together - but not
+# separately.
+cat > "${WORK}/rsheet.py" <<'PY'
+import os
+import re
+import sys
+import pya
+root = os.environ["PDKPATH"]
+sys.path.insert(0, os.path.join(root, "tools"))
+sys.path.insert(0, os.path.join(root, "libs.tech", "klayout", "tech", "pymacros"))
+from cells.draw_ind import path_length, spiral_with_leads
+
+tech = open(os.path.join(root, "libs.tech", "magic", "igzo_mmm_lab.tech")).read()
+r_sheet = float(re.search(r"^\s*resist gatemet\s+([\d.]+)", tech, re.M).group(1)) / 1000.0
+
+lib = pya.Library.library_by_name("igzo_mmm_lab_pr")
+decl = lib.layout().pcell_declaration("ind_igzo")
+ly = pya.Layout(); ly.dbu = 0.001
+cell = ly.cell(ly.add_pcell_variant(lib, decl.id(), {}))
+txt = [s.text.string for s in cell.shapes(ly.layer(63, 0)).each()][0]
+r_cell = float(re.search(r"/ ([\d.]+)Ohm", txt).group(1))
+
+squares = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0)) / 10.0
+r_magic = squares * r_sheet
+assert abs(r_magic - r_cell) / r_cell < 0.02, (
+    "the coil says %.1f Ohm, the techfile's sheet resistance says %.1f" %
+    (r_cell, r_magic))
+print("sheet resistance agrees: %.0f squares x %.3f Ohm/sq = %.1f Ohm, cell says %.1f"
+      % (squares, r_sheet, r_magic, r_cell))
+PY
+KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" PDKPATH="${PDKPATH}" \
+    "${KLAYOUT}" -z -nc -r "${WORK}/rsheet.py" > "${WORK}/rsheet.log" 2>&1 \
+    && grep -q "sheet resistance agrees" "${WORK}/rsheet.log" \
+    && pass "$(grep -o 'sheet resistance agrees.*' "${WORK}/rsheet.log")" \
+    || { cat "${WORK}/rsheet.log"; fail "sheet resistance"; }
+
+# --- 9d. extracted capacitance is the drawn capacitance ----------------------
+( cd "${WORK}" && magic -dnull -noconsole -nowrapper \
+    -rcfile "${PDKPATH}/libs.tech/magic/igzo_mmm_lab.magicrc" <<TCL > cap.log 2>&1
+drc off
+load ${ROOT}/libs.ref/igzo_mmm_lab_pr/mag/cap_mim_40p36
+extract all
+ext2spice lvs
+ext2spice cthresh 0
+ext2spice -o ${WORK}/cap_par.spice
+quit -noprompt
+TCL
+)
+python3 - "${WORK}/cap_par.spice" <<'PY' && pass "magic extracts 40.36 pF from the drawn capacitor" || fail "capacitance extraction"
+import re
+import sys
+txt = open(sys.argv[1]).read()
+m = re.search(r"^C0\s+\S+\s+\S+\s+([\d.]+)([fpn])", txt, re.M)
+assert m, "no capacitance extracted: " + txt
+scale = {"f": 1e-15, "p": 1e-12, "n": 1e-9}[m.group(2)]
+c = float(m.group(1)) * scale
+assert abs(c - 40.36e-12) / 40.36e-12 < 0.01, "extracted %g F, drew 40.36 pF" % c
+PY
 
 # --- 10. the via ------------------------------------------------------------
 python3 - "${WORK}/viatest.gds" <<'PY'

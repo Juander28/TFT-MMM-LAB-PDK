@@ -25,17 +25,30 @@ import math
 
 import pya
 
-from .layers import GATE, OXETCH, SD, TEXT, layer
+from .draw_tft import grid
+from .layers import (GATE, GATE_PIN, OXETCH, SD, SD_PIN, TEXT,
+                     layer)
 
 
 def _path(cell, li, points_um, width_um):
-    """Insert one path given in micrometres."""
+    """
+    Insert one path given in micrometres, snapped to the grid.
+
+    The path goes in as a polygon rather than as a pya.Path because a path's
+    mitred corners are computed, not given: on a curve they land wherever the
+    arithmetic puts them, off the grid, and magic then rescales the whole cell
+    when it reads the GDS and gets its capacitances wrong.  Snapping the
+    rendered outline costs at most half a grid step - 10 nm, a five-hundredth
+    of the smallest feature this process can print.
+    """
     dbu = cell.layout().dbu
+    g = int(round(GRID_UM / dbu))
     pts = [pya.Point(int(round(x / dbu)), int(round(y / dbu)))
            for x, y in points_um]
-    p = pya.Path(pts, int(round(width_um / dbu)))
-    cell.shapes(layer(cell.layout(), li)).insert(p)
-    return p
+    path = pya.Path(pts, int(round(width_um / dbu)))
+    region = pya.Region(path.polygon()).snapped(g, g)
+    cell.shapes(layer(cell.layout(), li)).insert(region)
+    return path
 
 
 def _box(cell, li, x1, y1, x2, y2):
@@ -66,6 +79,14 @@ def path_length(points_um):
     return sum(math.hypot(points_um[i + 1][0] - points_um[i][0],
                           points_um[i + 1][1] - points_um[i][1])
                for i in range(len(points_um) - 1))
+
+
+def _snap(x, y):
+    """A point on magic's grid.  See the note on grid() in draw_tft.py."""
+    return (round(x / GRID_UM) * GRID_UM, round(y / GRID_UM) * GRID_UM)
+
+
+GRID_UM = 0.02
 
 
 def square_spiral(d_in, w, gap, n):
@@ -122,10 +143,10 @@ def circular_spiral(d_in, w, gap, n, step_deg=2.0):
     step = math.radians(step_deg)
     while theta < theta_end:
         r = a + pitch * (theta - math.pi) / (2.0 * math.pi)
-        pts.append((r * math.cos(theta), r * math.sin(theta)))
+        pts.append(_snap(r * math.cos(theta), r * math.sin(theta)))
         theta += step
     r = a + pitch * (theta_end - math.pi) / (2.0 * math.pi)
-    pts.append((r * math.cos(theta_end), r * math.sin(theta_end)))
+    pts.append(_snap(r * math.cos(theta_end), r * math.sin(theta_end)))
     return pts
 
 
@@ -141,9 +162,20 @@ def spiral_with_leads(d_in, w, gap, n, shape="square", lead=40.0):
     return pts + [(pts[-1][0] + lead, pts[-1][1])]
 
 
+def _pin(cell, on_gate, name, x, y, size):
+    """A pin box and its label, on the coil's own metal."""
+    li = GATE_PIN if on_gate else SD_PIN
+    size = grid(size)
+    _box(cell, li, x - size / 2.0, y - size / 2.0, x + size / 2.0, y + size / 2.0)
+    dbu = cell.layout().dbu
+    t = pya.Text(name, pya.Trans(int(round(x / dbu)), int(round(y / dbu))))
+    t.size = int(round(size / dbu))
+    cell.shapes(layer(cell.layout(), li)).insert(t)
+
+
 def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
                 on_gate=True, lead=40.0, via=20.0, via_enc=5.0,
-                value_text=None):
+                pad=False, pad_size=200.0, lbl=True, value_text=None):
     """
     One spiral, plus the underpass that brings the inner end out.
 
@@ -182,15 +214,36 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     pad_out = via_out / 2.0 + via_enc
     x_in = pts[0][0] + pad_in              # pad centre, shifted inwards
     _box(cell, under_layer, x_exit - pad_out, -pad_out, x_in + pad_in, pad_out)
-    for x, via_w, pad in ((x_in, via_in, pad_in), (x_exit, via_out, pad_out)):
-        _box(cell, coil_layer, x - pad, -pad, x + pad, pad)
+    # `enc`, not `pad`: `pad` is the probe-pad flag from the caller, and
+    # rebinding it here quietly turned the pads on for every coil.
+    for x, via_w, enc in ((x_in, via_in, pad_in), (x_exit, via_out, pad_out)):
+        _box(cell, coil_layer, x - enc, -enc, x + enc, enc)
         _box(cell, OXETCH, x - via_w / 2.0, -via_w / 2.0,
              x + via_w / 2.0, via_w / 2.0)
 
+    # --- probe pads ---------------------------------------------------------
+    # One on the outer lead, one on the inner terminal's exit.  Both on the
+    # coil's own metal: at the exit the gate already reaches down to the
+    # underpass through the via, so the pad lands on the metal that is on top.
+    if pad:
+        half_p = pad_size / 2.0
+        _box(cell, coil_layer, x_out + lead, -half_p,
+             x_out + lead + pad_size, half_p)
+        _box(cell, coil_layer, x_exit - pad_size, -half_p, x_exit, half_p)
+
+    # Terminals.  Without these the extracted coil has no named nodes, and
+    # neither LVS nor a resistance extraction has anything to report.
+    if lbl:
+        size = grid(min(w, 2.0 * pad_out))
+        x_a = x_out + lead + (pad_size / 2.0 if pad else -w)
+        x_b = x_exit - (pad_size / 2.0 if pad else 0.0)
+        _pin(cell, on_gate, "A", x_a, 0.0, size)
+        _pin(cell, on_gate, "B", x_b, 0.0, size)
+
     if value_text:
         # below the coil: the middle is taken by the via
-        y_txt = -(abs(min(p[1] for p in pts)) + 3.0 * w)
-        _text(cell, value_text, 0.0, y_txt, max(4.0, d_in / 8.0))
+        y_txt = -grid(abs(min(p[1] for p in pts)) + 3.0 * w)
+        _text(cell, value_text, 0.0, y_txt, grid(max(4.0, d_in / 8.0)))
     return pts
 
 
@@ -221,15 +274,17 @@ def ring_centrelines(d_in, w, gap, n, shape="square", slot=None):
             th0 = math.asin(sin_th)
             x0 = r * math.cos(th0)
             span = 2.0 * math.pi - 2.0 * th0
-            arc = [(r * math.cos(th0 + span * i / steps),
-                    r * math.sin(th0 + span * i / steps))
+            arc = [_snap(r * math.cos(th0 + span * i / steps),
+                         r * math.sin(th0 + span * i / steps))
                    for i in range(steps + 1)]
+            x0 = round(x0 / GRID_UM) * GRID_UM
             out.append([(x0, slot)] + arc + [(x0, -slot)])
     return out
 
 
 def draw_rings(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
-               on_gate=True, lead=40.0, slot=None, value_text=None):
+               on_gate=True, lead=40.0, slot=None, pad=False, pad_size=200.0,
+               lbl=True, value_text=None):
     """
     n concentric open rings on one metal, tied to two buses.
 
@@ -249,16 +304,41 @@ def draw_rings(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     for pts in rings:
         _path(cell, coil_layer, pts, w)
 
-    # the two buses, running out through the slot.  They start at the innermost
-    # ring rather than at the origin: a stub reaching into the empty middle of
-    # the coil connects nothing and only adds resistance.
-    r_out = a + (int(n) - 1) * pitch
-    _path(cell, coil_layer, [(a, slot), (r_out + lead, slot)], w)
-    _path(cell, coil_layer, [(a, -slot), (r_out + lead, -slot)], w)
+    # The two buses, running out through the slot.  They start half a track
+    # width inside the innermost stub - not at the origin, which would add a
+    # spur into the empty middle that connects nothing, and not at the
+    # innermost radius either: a circular ring's stub stands further in than
+    # its radius, so a bus starting at the radius misses the inner ring
+    # altogether and leaves it floating.  That is exactly what happened here
+    # before, and it is why the cells now get a connectivity check.
+    x_start = min(pts[0][0] for pts in rings) - w / 2.0
+    x_end = max(max(x for x, _ in pts) for pts in rings) + lead
+    _path(cell, coil_layer, [(x_start, slot), (x_end, slot)], w)
+    _path(cell, coil_layer, [(x_start, -slot), (x_end, -slot)], w)
+
+    # A pad on the end of each bus.  They are offset outwards from the slot so
+    # that two pads of any size do not run into each other.
+    if pad:
+        half_p = pad_size / 2.0
+        for sign in (1.0, -1.0):
+            y_c = sign * (slot + half_p - w / 2.0)
+            _box(cell, coil_layer, x_end, y_c - half_p, x_end + pad_size,
+                 y_c + half_p)
+            _box(cell, coil_layer, x_end, min(y_c, sign * slot) - w / 2.0,
+                 x_end + w, max(y_c, sign * slot) + w / 2.0)
+
+    if lbl:
+        size = grid(min(w, 20.0))
+        for name, sign in (("A", 1.0), ("B", -1.0)):
+            if pad:
+                y_c = sign * (slot + pad_size / 2.0 - w / 2.0)
+                _pin(cell, on_gate, name, x_end + pad_size / 2.0, y_c, size)
+            else:
+                _pin(cell, on_gate, name, x_end - w, sign * slot, size)
 
     if value_text:
-        y_txt = -(a + int(n) * pitch + 3.0 * w)
-        _text(cell, value_text, 0.0, y_txt, max(4.0, d_in / 8.0))
+        y_txt = -grid(a + int(n) * pitch + 3.0 * w)
+        _text(cell, value_text, 0.0, y_txt, grid(max(4.0, d_in / 8.0)))
     return rings
 
 

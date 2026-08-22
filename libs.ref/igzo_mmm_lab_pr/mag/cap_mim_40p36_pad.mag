@@ -1,0 +1,22 @@
+magic
+tech igzo_mmm_lab
+timestamp 1616032767
+<< checkpaint >>
+rect -20500 -106532 68532 20500
+<< sdmet >>
+rect -8032 -28032 8032 8032
+rect -20000 -68032 20000 -28032
+<< gatemet >>
+rect 28032 8032 68032 20000
+rect -8032 -8032 68032 8032
+rect 28032 -20000 68032 -8032
+<< oxetch >>
+rect -6032 -26032 6032 -10032
+rect -18000 -106032 18000 -70032
+<< labels >>
+rlabel sdmet s -402 -48434 402 -47630 4 MINUS
+port 1 nsew
+rlabel gatemet s 47630 -402 48434 402 4 PLUS
+port 3 nsew
+rlabel text s 0 0 0 0 4 cap_mim 40.36pF
+<< end >>

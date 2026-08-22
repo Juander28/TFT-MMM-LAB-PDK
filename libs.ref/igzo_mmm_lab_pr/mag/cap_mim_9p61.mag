@@ -1,19 +1,18 @@
 magic
 tech igzo_mmm_lab
-magscale 1 2
-timestamp 1615964164
+timestamp 1616032767
 << checkpaint >>
-rect -48839 -48839 48839 8839
+rect -4419 -24419 24419 4419
 << sdmet >>
-rect -7839 -47839 7839 7839
+rect -3919 -23919 3919 3919
 << gatemet >>
-rect -47839 -7839 47839 7839
+rect -3919 -3919 23919 3919
 << oxetch >>
-rect -3839 -43839 3839 -11839
+rect -1919 -21919 1919 -5919
 << labels >>
-rlabel sdmet s -392 -28231 392 -27447 4 MINUS
+rlabel sdmet s -196 -14115 196 -13723 4 MINUS
 port 1 nsew
-rlabel gatemet s 27447 -392 28231 392 4 PLUS
+rlabel gatemet s 13723 -196 14115 196 4 PLUS
 port 3 nsew
-rlabel text s 0 0 0 0 4 cap_mim 9.611pF
+rlabel text s 0 0 0 0 4 cap_mim 9.608pF
 << end >>

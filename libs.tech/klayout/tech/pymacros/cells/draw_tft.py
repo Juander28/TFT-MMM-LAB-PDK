@@ -34,6 +34,18 @@ from .layers import (GATE, GATE_PIN, IGZO, OXETCH, SD, SD_PIN, TEXT,
                      layer)
 
 
+# Magic's internal grid is 10 nm.  Anything that lands off it makes magic
+# rescale the whole cell (magscale 1 10) when it reads the GDS, and after that
+# the extracted capacitances are wrong - quietly, with no warning.  Sizes that
+# come out of a division go through here first.
+GRID = 0.02          # um
+
+
+def grid(value, g=GRID):
+    """Snap a length to the grid, keeping it positive."""
+    return max(g, round(value / g) * g)
+
+
 def _box(cell, li, x1, y1, x2, y2):
     """Insert a box given in micrometres."""
     dbu = cell.layout().dbu
@@ -146,7 +158,7 @@ def draw_tft(
         s_x = (electrodes[0][0] + electrodes[0][1]) / 2.0
         d_x = (electrodes[-1][0] + electrodes[-1][1]) / 2.0
         g_x = 0.0
-        size = max(1.0, min(w_gate, sd_len) / 10.0)
+        size = grid(max(1.0, min(w_gate, sd_len) / 10.0))
         # The text goes on the pin purpose, not the label purpose: that is
         # what magic's cifinput turns into a port (`labels SDPIN port`), and
         # what KLayout's netlist extraction reads as the net name.
@@ -173,8 +185,9 @@ def stamp(cell, text, x, y, size):
     _text(cell, TEXT, text, x, y, size)
 
 
-def draw_cap_mim(cell, w=400.0, l=400.0, ext=200.0, etch_inset=20.0,
-                 lbl=False, value_text=None):
+def draw_cap_mim(cell, w=400.0, l=400.0, ext_sd=200.0, ext_gate=200.0,
+                 ext_sd_far=0.0, ext_gate_far=0.0, etch_inset=20.0,
+                 pad=False, pad_size=400.0, lbl=False, value_text=None):
     """
     Overlap capacitor: source/drain Au below, blanket 50 nm Al2O3, gate Au on
     top.  The capacitance is the crossing area, w * l.
@@ -185,26 +198,57 @@ def draw_cap_mim(cell, w=400.0, l=400.0, ext=200.0, etch_inset=20.0,
     Cox = 156.4 nF/cm^2 = 1.564 fF/um^2 comes from - the one number in this PDK
     that is a direct capacitance measurement.
 
-    Each plate runs past the crossing by `ext` so a probe has somewhere to
-    land, and the dielectric is opened over the lower plate's tail.
+    Each plate runs past the crossing on its terminal side by ext_*, and can
+    also run past it on the far side by ext_*_far.  The two metals get their
+    own numbers because they are not the same conductor and rarely want the
+    same shape: the S/D plate usually reaches down to whatever it connects to,
+    while the gate plate reaches sideways.  A far-side extension is there for
+    when the plate has to be caught from both ends - a tank capacitor sitting
+    between two nodes, for instance - and it costs nothing but area when it is
+    zero, which is the default.
+
+    The dielectric is opened over the S/D plate's terminal tail: that metal is
+    under the blanket film, and without a window nothing can touch it.  The
+    gate plate is on top of the film and needs none.
     """
     half_w, half_l = w / 2.0, l / 2.0
-    # Lower plate: S/D metal, running out below the crossing.
-    _box(cell, SD, -half_w, -half_l - ext, half_w, half_l)
+    # Lower plate: S/D metal, running down to its terminal and optionally up.
+    sd_bot = -half_l - ext_sd
+    sd_top = half_l + ext_sd_far
+    _box(cell, SD, -half_w, sd_bot, half_w, sd_top)
+    # Upper plate: gate metal, running right to its terminal and optionally left.
+    g_left = -half_w - ext_gate_far
+    g_right = half_w + ext_gate
+    _box(cell, GATE, g_left, -half_l, g_right, half_l)
+
     # Window in the gate dielectric over the lower plate's tail.
-    _box(cell, OXETCH, -half_w + etch_inset, -half_l - ext + etch_inset,
-         half_w - etch_inset, -half_l - etch_inset)
-    # Upper plate: gate metal, running out sideways.
-    _box(cell, GATE, -half_w - ext, -half_l, half_w + ext, half_l)
+    if ext_sd > 2.0 * etch_inset:
+        _box(cell, OXETCH, -half_w + etch_inset, sd_bot + etch_inset,
+             half_w - etch_inset, -half_l - etch_inset)
+
+    # --- probe pads ---------------------------------------------------------
+    if pad:
+        half_p = pad_size / 2.0
+        # S/D pad hangs below the lower plate, with its own window.
+        _box(cell, SD, -half_p, sd_bot - pad_size, half_p, sd_bot)
+        sd_bot -= pad_size
+        _box(cell, OXETCH, -half_p + etch_inset, sd_bot - pad_size + etch_inset,
+             half_p - etch_inset, sd_bot - etch_inset)
+        # Gate pad sits beyond the upper plate; it is above the dielectric.
+        _box(cell, GATE, g_right, -half_p, g_right + pad_size, half_p)
+        g_right += pad_size
+
     if value_text:
-        stamp(cell, value_text, 0.0, 0.0, max(2.0, min(w, l) / 12.0))
+        stamp(cell, value_text, 0.0, 0.0, grid(max(2.0, min(w, l) / 12.0)))
     if lbl:
-        size = max(1.0, min(w, l) / 20.0)
-        y_lo = -half_l - ext / 2.0
+        size = grid(max(1.0, min(w, l) / 20.0))
+        # Inside the metal, not past the end of it: a pin outside the shape it
+        # names attaches to nothing, and the extracted net comes out unnamed.
+        y_lo = sd_bot + (pad_size / 2.0 if pad else max(ext_sd, size) / 2.0)
         _box(cell, SD_PIN, -size / 2.0, y_lo - size / 2.0,
              size / 2.0, y_lo + size / 2.0)
         _text(cell, SD_PIN, "MINUS", 0.0, y_lo, size)
-        x_hi = half_w + ext / 2.0
+        x_hi = g_right - (pad_size / 2.0 if pad else max(ext_gate, size) / 2.0)
         _box(cell, GATE_PIN, x_hi - size / 2.0, -size / 2.0,
              x_hi + size / 2.0, size / 2.0)
         _text(cell, GATE_PIN, "PLUS", x_hi, 0.0, size)

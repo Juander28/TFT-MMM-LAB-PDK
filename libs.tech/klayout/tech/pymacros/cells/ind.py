@@ -109,7 +109,12 @@ class ind_igzo(pya.PCellDeclarationHelper):
                    default=IND_FREQ, unit="MHz")
         self.param("lead", self.TypeDouble, "Terminal lead length",
                    default=40.0, unit="um")
+        self.param("pad", self.TypeBoolean, "Probe pads", default=False)
+        self.param("pad_size", self.TypeDouble, "Pad size",
+                   default=200.0, unit="um")
         self.param("show_value", self.TypeBoolean, "Print the value on the cell",
+                   default=True)
+        self.param("lbl", self.TypeBoolean, "Pins and labels (A, B)",
                    default=True)
 
         self.param("l_series", self.TypeDouble, "Series inductance",
@@ -216,8 +221,10 @@ class ind_igzo(pya.PCellDeclarationHelper):
         if self.topology == "series":
             draw_spiral(self.cell, d_in=self.d_in, w=self.w, gap=self.gap,
                         n=self.n, shape=self.shape, on_gate=on_gate,
-                        lead=self.lead, value_text=text)
+                        lead=self.lead, pad=self.pad, pad_size=self.pad_size,
+                        lbl=self.lbl, value_text=text)
         else:
             draw_rings(self.cell, d_in=self.d_in, w=self.w, gap=self.gap,
                        n=self.n, shape=self.shape, on_gate=on_gate,
-                       lead=self.lead, value_text=text)
+                       lead=self.lead, pad=self.pad, pad_size=self.pad_size,
+                       lbl=self.lbl, value_text=text)
