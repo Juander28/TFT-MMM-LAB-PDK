@@ -52,7 +52,10 @@ source ${PDKPATH}/libs.tech/xschem/xschemrc
 set netlist_dir ${HERE}
 XRC
 for pair in "symbols/tft_igzo.sym:xschem_sym.png" \
+            "symbols/cap_mim.sym:xschem_cap_sym.png" \
+            "symbols/ind_igzo.sym:xschem_ind_sym.png" \
             "tests/tft_iv.sch:xschem_tb.png" \
+            "tests/tank_ac.sch:xschem_tank.png" \
             "tests/tft_igzo_l10w100.sch:xschem_lvs.png"; do
     src="${pair%%:*}"; png="${pair##*:}"
     # xschem exits non-zero after a successful batch export, hence the || true

@@ -4,147 +4,17 @@ Build the "cells and tools" guide for TFT-MMM-LAB-PDK, in English and Spanish.
 
     python3 make_pdf.py            # both languages
     python3 make_pdf.py en         # one of them
+    python3 make_pdf.py es ~/out   # and somewhere else
 
 Figures come from ../figures; regenerate them with make_figures.sh after any
-change to the PCells or the tech files.  Output goes to ../docs.
+change to the PCells or the tech files.  PDFs go to ~/Documents/PDK-TFT-MMM-LAB
+by default.
 """
 
 import os
 import sys
-import textwrap
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from matplotlib.backends.backend_pdf import PdfPages
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-FIG = os.path.join(ROOT, "figures")
-DOCS = os.path.join(ROOT, "docs")
-
-A4 = (8.27, 11.69)
-INK = "#1a1a1a"
-MUTED = "#555555"
-ACCENT = "#8a3324"
-RULE = "#c9c4bd"
-CODEBG = "#f2f0ec"
-L, R = 0.075, 0.925
-TOP = 0.945
-
-
-def lh(size, lead=1.45):
-    """Line height in figure coordinates for a font size in points."""
-    return size / 72.0 / A4[1] * lead
-
-
-class Page:
-    def __init__(self, pdf, title, kicker=None, footer=""):
-        self.pdf = pdf
-        self.footer = footer
-        self.fig = plt.figure(figsize=A4)
-        self.fig.patch.set_facecolor("white")
-        self.y = TOP
-        if kicker:
-            self.fig.text(L, self.y, kicker.upper(), size=7.5, color=ACCENT,
-                          weight="bold", family="DejaVu Sans", va="top")
-            self.y -= lh(7.5, 2.2)
-        for line in title.split("\n"):
-            self.fig.text(L, self.y, line, size=17, color=INK, weight="bold",
-                          family="DejaVu Sans", va="top")
-            self.y -= lh(17, 1.25)
-        self.y -= 0.012
-        self.rule()
-
-    def rule(self, gap=0.014):
-        self.fig.add_artist(plt.Line2D([L, R], [self.y, self.y],
-                                       color=RULE, lw=0.8))
-        self.y -= gap
-
-    def text(self, s, size=9.2, color=INK, gap=None, weight="normal"):
-        step = gap if gap else lh(size)
-        for line in s.split("\n"):
-            self.fig.text(L, self.y, line, size=size, color=color,
-                          family="DejaVu Sans", va="top", weight=weight)
-            self.y -= step
-        self.y -= 0.006
-
-    def head(self, s):
-        self.y -= 0.012
-        self.fig.text(L, self.y, s, size=11, color=ACCENT, weight="bold",
-                      family="DejaVu Sans", va="top")
-        self.y -= lh(11, 2.0)
-
-    def code(self, s, size=8.2, pad=0.010):
-        step = lh(size, 1.5)
-        lines = s.strip("\n").split("\n")
-        h = len(lines) * step + 2 * pad
-        self.fig.add_artist(plt.Rectangle((L - 0.012, self.y - h + step * 0.25),
-                                          R - L + 0.024, h, facecolor=CODEBG,
-                                          edgecolor="none",
-                                          transform=self.fig.transFigure))
-        self.y -= pad
-        for line in lines:
-            self.fig.text(L, self.y, line, size=size, color=INK,
-                          family="DejaVu Sans Mono", va="top")
-            self.y -= step
-        self.y -= pad + 0.006
-
-    def table(self, rows, widths, size=8.6, header=True, gap=None):
-        step = gap if gap else lh(size, 1.7)
-        xs = [L]
-        for w in widths[:-1]:
-            xs.append(xs[-1] + w * (R - L))
-        for i, row in enumerate(rows):
-            bold = "bold" if (header and i == 0) else "normal"
-            col = INK if (header and i == 0) else MUTED
-            for x, cell in zip(xs, row):
-                self.fig.text(x, self.y, cell, size=size, color=col,
-                              family="DejaVu Sans", va="top", weight=bold)
-            self.y -= step
-            if header and i == 0:
-                self.y += step * 0.25
-                self.rule(gap=0.010)
-        self.y -= 0.006
-
-    def image(self, path, caption=None, width=1.0, crop=None):
-        img = mpimg.imread(os.path.join(FIG, path))
-        if crop:
-            x0, y0, x1, y1 = crop
-            img = img[y0:y1, x0:x1]
-        ih, iw = img.shape[0], img.shape[1]
-        w_fig = (R - L) * width
-        h_fig = w_fig * (ih / iw) * (A4[0] / A4[1])
-        avail = self.y - 0.085 - (0.048 if caption else 0.0)
-        if h_fig > avail:
-            scale = avail / h_fig
-            h_fig *= scale
-            w_fig *= scale
-        x0 = L + ((R - L) - w_fig) / 2
-        ax = self.fig.add_axes([x0, self.y - h_fig, w_fig, h_fig])
-        ax.imshow(img)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_color(RULE)
-            spine.set_linewidth(0.6)
-        self.y -= h_fig + 0.008
-        if caption:
-            for line in textwrap.wrap(caption, 118):
-                self.fig.text(L, self.y, line, size=7.8, color=MUTED,
-                              family="DejaVu Sans", va="top", style="italic")
-                self.y -= lh(7.8)
-        self.y -= 0.010
-
-    def close(self, n):
-        if self.y < 0.075:
-            print("  ! page %d overflows: y=%.3f" % (n, self.y))
-        self.fig.text(R, 0.035, str(n), size=8, color=MUTED, ha="right")
-        self.fig.text(L, 0.035, self.footer, size=8, color=MUTED)
-        self.pdf.savefig(self.fig)
-        plt.close(self.fig)
-
+from pdfkit import ACCENT, INK, MUTED, Page, PdfPages, default_out_dir
 
 # ---------------------------------------------------------------------------
 # Code blocks are the same in both languages; only their comments change.
@@ -191,14 +61,14 @@ OK  gate 2/0  PCell stripe 20 um over the island, overlap [5.0, 5.0] um per side
 OK  gate 2/0  GDS   stripe 20 um over the island, overlap [5.0, 5.0] um per side
 OK  nf=1/2/5  shared electrodes, W_total = 100 / 200 / 500 um
 OK  drawn channel gap 10 um - the +3 um print bias is reported, not drawn""",
-    "netlist": "XM1 D G S B igzo_tft W=1000u L=8u ov=5u nf=1",
+    "netlist": "XM1 D G S igzo_tft W=1000u L=8u ov=5u nf=1",
     "extract": """% load $PDKPATH/libs.ref/igzo_mmm_lab_pr/mag/tft_igzo_l10w100
 % extract all
 % ext2spice lvs
 % ext2spice -o layout.spice
 
 .subckt tft_igzo_l10w100 S D G
-X0 D G S GND igzo_tft w=0.11333m l=10u
+X0 D G S igzo_tft w=0.11333m l=10u
 .ends""",
     "lvs": """$ netgen -batch lvs "layout.spice tft_igzo_l10w100" \\
                      "schematic.spice tft_igzo_l10w100" \\
@@ -263,7 +133,7 @@ EN = {
         ["Technology name", "igzo_mmm_lab"],
         ["Device library", "igzo_mmm_lab_pr"],
     ],
-    "p1_cap": "The 32 generated cells in KLayout, technology igzo_mmm_lab selected. "
+    "p1_cap": "The 39 generated cells in KLayout, technology igzo_mmm_lab selected. "
               "Cell list on the left, layer palette on the right.",
     # page 2
     "p2_kicker": "setup",
@@ -303,13 +173,17 @@ EN = {
     "p3_kicker": "libs.ref / igzo_mmm_lab_pr",
     "p3_title": "The cell library",
     "p3_intro":
-        "Two PCells generate everything. The library ships 32 cells: the transistor matrix\n"
-        "drawn on the test chip, the same device with its probe pads, and the capacitor.",
+        "Three PCells generate everything. The library ships 39 cells: the transistor matrix\n"
+        "drawn on the test chip, the same device with its probe pads, three capacitors and\n"
+        "five inductors. The passives have their own document - the cell SOP - which goes\n"
+        "through every parameter and where its default came from.",
     "p3_cells": [
         ["Cell", "Count", "What it is"],
         ["tft_igzo_l{L}w{W}", "30", "L in {5,10,20,40,80,160} um x W in {10,50,100,500,1000} um"],
         ["tft_igzo_l10w100_pad", "1", "the fabricated device, 400x400 um probe pads included"],
         ["cap_mim_400x400", "1", "the overlap capacitor Cox was measured on"],
+        ["cap_mim_40p36 / _9p61", "2", "sized by capacitance instead of by dimensions"],
+        ["ind_igzo_*", "5", "square/circular x series/parallel, plus the 100 MHz tank coil"],
     ],
     "p3_h1": "They are generated, not drawn",
     "p3_gen":
@@ -369,9 +243,9 @@ EN = {
     # page 6
     "p6_kicker": "schematic",
     "p6_title": "In xschem",
-    "p6_cap": "symbols/tft_igzo.sym. Four pins in the order D, G, S, B - the same order the "
-              "igzo_tft subcircuit declares. B is inert: a TFT has no body, and the pin is "
-              "kept only so the symbol drops into existing four-pin testbenches.",
+    "p6_cap": "symbols/tft_igzo.sym. Three pins in the order D, G, S - the same order the "
+              "igzo_tft subcircuit declares. There is no bulk pin: a TFT sits on glass, and "
+              "the wrapper keeps the intrinsic device's bulk tied to its own source.",
     "p6_h1": "What it netlists to",
     "p6_expl":
         "W, L and ov are drawn dimensions in metres. spiceprefix=X because the device is a\n"
@@ -410,11 +284,12 @@ EN = {
         "in the file itself why the two tolerances differ. Setting W wrong in the schematic\n"
         "does fail - it was checked: W = 500u against the extracted 113 um reports property\n"
         "errors rather than passing quietly.",
-    "p8_h3": "Tie B to GND",
+    "p8_h3": "Three terminals, on both sides",
     "p8_gnd":
-        "Magic names the inert fourth pin GND and declares it global. Schematics should tie\n"
-        "B to GND so both sides of LVS have the same four nets; tests/tft_igzo_l10w100.sch\n"
-        "is the worked example.",
+        "Magic emits three terminals because the msubcircuit line in the techfile carries no\n"
+        "substrate arguments. The other form, \"device subcircuit\", also emits three - but in\n"
+        "the order G S D, which would disagree with the symbol silently. Pin order is the\n"
+        "first thing LVS checks, and a swapped gate is the one mistake that still simulates.",
     # page 9
     "p9_kicker": "models",
     "p9_title": "In ngspice",
@@ -451,7 +326,7 @@ EN = {
         ["PCell against the fabricated cell", "klayout", "identical on all three layers"],
         ["Technology and library discovery", "klayout", "igzo_mmm_lab, igzo_mmm_lab_pr"],
         ["DRC on the generated primitives", "klayout", "clean"],
-        ["Symbol netlists with D G S B", "xschem", "pin order correct"],
+        ["Symbol netlists with D G S", "xschem", "pin order correct"],
         ["Model against the measurement", "ngspice", "654.4 uA"],
         ["GDS round-trip", "magic", "layer-exact"],
         ["Device extraction", "magic", "one igzo_tft, l = 10 um"],
@@ -520,7 +395,7 @@ ES = {
         ["Nombre de la tecnología", "igzo_mmm_lab"],
         ["Librería de dispositivos", "igzo_mmm_lab_pr"],
     ],
-    "p1_cap": "Las 32 celdas generadas en KLayout, con la tecnología igzo_mmm_lab "
+    "p1_cap": "Las 39 celdas generadas en KLayout, con la tecnología igzo_mmm_lab "
               "seleccionada. Lista de celdas a la izquierda, paleta de capas a la derecha.",
     # page 2
     "p2_kicker": "instalación",
@@ -560,13 +435,17 @@ ES = {
     "p3_kicker": "libs.ref / igzo_mmm_lab_pr",
     "p3_title": "La librería de celdas",
     "p3_intro":
-        "Dos PCells generan todo. La librería trae 32 celdas: la matriz de transistores que\n"
-        "está dibujada en el chip de prueba, el mismo dispositivo con sus pads, y el capacitor.",
+        "Tres PCells generan todo. La librería trae 39 celdas: la matriz de transistores del\n"
+        "chip de prueba, el mismo dispositivo con sus pads, tres capacitores y cinco\n"
+        "inductores. Las pasivas tienen su propio documento - el SOP de celdas - que recorre\n"
+        "cada parámetro y de dónde salió su valor por defecto.",
     "p3_cells": [
         ["Celda", "Cantidad", "Qué es"],
         ["tft_igzo_l{L}w{W}", "30", "L en {5,10,20,40,80,160} um x W en {10,50,100,500,1000} um"],
         ["tft_igzo_l10w100_pad", "1", "el dispositivo fabricado, con sus pads de 400x400 um"],
         ["cap_mim_400x400", "1", "el capacitor de solape con el que se midió Cox"],
+        ["cap_mim_40p36 / _9p61", "2", "dimensionados por capacitancia, no por medidas"],
+        ["ind_igzo_*", "5", "cuadrado/circular x serie/paralelo, más la bobina del tanque"],
     ],
     "p3_h1": "Están generadas, no dibujadas a mano",
     "p3_gen":
@@ -626,9 +505,9 @@ ES = {
     # page 6
     "p6_kicker": "esquemático",
     "p6_title": "En xschem",
-    "p6_cap": "symbols/tft_igzo.sym. Cuatro pines en el orden D, G, S, B - el mismo orden en "
-              "que el subcircuito igzo_tft los declara. B es inerte: un TFT no tiene cuerpo, y "
-              "el pin se conserva solo para que el símbolo entre en testbenches de cuatro pines.",
+    "p6_cap": "symbols/tft_igzo.sym. Tres pines en el orden D, G, S - el mismo orden en que el "
+              "subcircuito igzo_tft los declara. No hay pin de bulk: un TFT esta sobre vidrio, y "
+              "el envoltorio deja el bulk del dispositivo intrinseco atado a su propia fuente.",
     "p6_h1": "Qué netlist produce",
     "p6_expl":
         "W, L y ov son dimensiones dibujadas, en metros. spiceprefix=X porque el dispositivo es\n"
@@ -667,11 +546,12 @@ ES = {
         "propio archivo por qué las dos tolerancias son distintas. Poner mal W en el esquemático\n"
         "sí falla - se comprobó: W = 500u contra las 113 um extraídas reporta errores de\n"
         "propiedad en vez de pasar en silencio.",
-    "p8_h3": "Conecta B a GND",
+    "p8_h3": "Tres terminales, de los dos lados",
     "p8_gnd":
-        "Magic llama GND al cuarto pin inerte y lo declara global. Los esquemáticos deben atar B\n"
-        "a GND para que ambos lados del LVS tengan las mismas cuatro redes;\n"
-        "tests/tft_igzo_l10w100.sch es el ejemplo resuelto.",
+        "Magic emite tres terminales porque la linea msubcircuit del techfile no lleva\n"
+        "argumentos de sustrato. La otra forma, \"device subcircuit\", tambien emite tres - pero\n"
+        "en el orden G S D, que discreparia del simbolo en silencio. El orden de pines es lo\n"
+        "primero que revisa el LVS, y una compuerta cambiada es el unico error que aun simula.",
     # page 9
     "p9_kicker": "modelos",
     "p9_title": "En ngspice",
@@ -708,7 +588,7 @@ ES = {
         ["PCell contra la celda fabricada", "klayout", "idéntico en las tres capas"],
         ["Tecnología y librería visibles", "klayout", "igzo_mmm_lab, igzo_mmm_lab_pr"],
         ["DRC sobre las primitivas generadas", "klayout", "limpio"],
-        ["El símbolo netlista con D G S B", "xschem", "orden de pines correcto"],
+        ["El símbolo netlista con D G S", "xschem", "orden de pines correcto"],
         ["Modelo contra la medición", "ngspice", "654.4 uA"],
         ["Ida y vuelta de GDS", "magic", "exacto por capa"],
         ["Extracción del dispositivo", "magic", "un igzo_tft, l = 10 um"],
@@ -868,12 +748,11 @@ def content(pdf, S, lang):
     p.close(n)
 
 
-def build(lang):
+def build(lang, out_dir=None):
     strings = {"en": EN, "es": ES}[lang]
     name = {"en": "TFT-MMM-LAB-PDK_cells_and_tools_en.pdf",
             "es": "TFT-MMM-LAB-PDK_celdas_y_herramientas_es.pdf"}[lang]
-    out = os.path.join(DOCS, name)
-    os.makedirs(DOCS, exist_ok=True)
+    out = os.path.join(default_out_dir(out_dir), name)
     with PdfPages(out) as pdf:
         content(pdf, strings, lang)
         info = pdf.infodict()
@@ -885,6 +764,9 @@ def build(lang):
 
 
 if __name__ == "__main__":
-    langs = sys.argv[1:] or ["en", "es"]
-    for lg in langs:
-        build(lg)
+    args = sys.argv[1:]
+    out_dir = None
+    if args and args[-1].startswith(("/", "~", ".")):
+        out_dir = os.path.expanduser(args.pop())
+    for lg in (args or ["en", "es"]):
+        build(lg, out_dir)

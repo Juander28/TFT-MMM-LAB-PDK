@@ -41,3 +41,10 @@ shot("tft_igzo_l10w100_pad", "klayout_tft_pad.png")
 shot("tft_igzo_l10w100", "klayout_tft_zoom.png", box=(-30, -70, 30, 70))
 shot("cap_mim_400x400", "klayout_cap.png")
 shot("tft_igzo_l160w1000", "klayout_tft_big.png")
+
+# the passives
+shot("cap_mim_40p36", "klayout_cap_40p36.png")
+shot("ind_igzo_square_series", "klayout_ind_sq_series.png")
+shot("ind_igzo_circular_series", "klayout_ind_ci_series.png")
+shot("ind_igzo_square_parallel", "klayout_ind_sq_parallel.png")
+shot("ind_igzo_tank_100mhz", "klayout_ind_tank.png")
