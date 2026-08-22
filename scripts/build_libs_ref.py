@@ -61,8 +61,27 @@ def main():
         {"l_gate": 10.0, "w_gate": 100.0, "pad": True, "lbl": True})
     # The structure Cox was measured on.
     add(layout, lib, "cap_mim", "cap_mim_400x400",
-        {"w": 400.0, "l": 400.0, "lbl": True})
-    count += 2
+        {"mode": "by dimensions", "w": 400.0, "l": 400.0, "lbl": True})
+    # Sized by capacitance instead: the 40.36 pF the tuned stage asks for, and
+    # the 9.61 pF that resonates with the 16-turn coil below at 100 MHz.
+    add(layout, lib, "cap_mim", "cap_mim_40p36",
+        {"mode": "by capacitance", "c_target": 40362.0, "lbl": True})
+    add(layout, lib, "cap_mim", "cap_mim_9p61",
+        {"mode": "by capacitance", "c_target": 9610.0, "lbl": True})
+    count += 4
+
+    # Inductors: one of each shape and topology at the default size, plus the
+    # big coil the 100 MHz tank needs.
+    for shape in ("square", "circular"):
+        for topology in ("series", "parallel"):
+            add(layout, lib, "ind_igzo",
+                "ind_igzo_%s_%s" % (shape, topology),
+                {"shape": shape, "topology": topology})
+            count += 1
+    add(layout, lib, "ind_igzo", "ind_igzo_tank_100mhz",
+        {"shape": "square", "topology": "series", "n": 16, "d_in": 400.0,
+         "w": 20.0, "gap": 10.0})
+    count += 1
 
     out = os.path.join(ROOT, "libs.ref", "igzo_mmm_lab_pr", "gds",
                        "tft_primitives.gds")

@@ -30,7 +30,8 @@ drawn.  See docs/PDK_GUIDE.md section 8.
 
 import pya
 
-from .layers import GATE, GATE_PIN, IGZO, OXETCH, SD, SD_PIN, layer
+from .layers import (GATE, GATE_PIN, IGZO, OXETCH, SD, SD_PIN, TEXT,
+                     layer)
 
 
 def _box(cell, li, x1, y1, x2, y2):
@@ -161,8 +162,19 @@ def draw_tft(
     return cell
 
 
+def stamp(cell, text, x, y, size):
+    """
+    Write a value onto the cell, the way a foundry cell carries its own name.
+
+    Layer 63/0 is annotation only - it is not a mask and is never fabricated.
+    The point is that a layout opened six months from now says what it is
+    without anyone having to reopen the parameter dialog.
+    """
+    _text(cell, TEXT, text, x, y, size)
+
+
 def draw_cap_mim(cell, w=400.0, l=400.0, ext=200.0, etch_inset=20.0,
-                 lbl=False):
+                 lbl=False, value_text=None):
     """
     Overlap capacitor: source/drain Au below, blanket 50 nm Al2O3, gate Au on
     top.  The capacitance is the crossing area, w * l.
@@ -184,6 +196,8 @@ def draw_cap_mim(cell, w=400.0, l=400.0, ext=200.0, etch_inset=20.0,
          half_w - etch_inset, -half_l - etch_inset)
     # Upper plate: gate metal, running out sideways.
     _box(cell, GATE, -half_w - ext, -half_l, half_w + ext, half_l)
+    if value_text:
+        stamp(cell, value_text, 0.0, 0.0, max(2.0, min(w, l) / 12.0))
     if lbl:
         size = max(1.0, min(w, l) / 20.0)
         y_lo = -half_l - ext / 2.0

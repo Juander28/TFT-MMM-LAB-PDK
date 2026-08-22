@@ -1,0 +1,42 @@
+v {xschem version=3.4.5 file_version=1.2
+
+* S/D-metal / Al2O3 / gate-metal overlap capacitor - UCI/INRF process
+*
+* Drawing after xschem's own devices/capa.sym (GPL-2.0, Stefan Frederik
+* Schippers); the electrical part is this process.
+*
+* Two pins, in the order the subcircuit declares them:
+*     .subckt cap_mim p m
+* p is the gate-metal plate (the upper one), m the source/drain plate.
+*
+* W and L are the drawn crossing, in metres.  The capacitance is not a
+* parameter: it is Cox * W * L with Cox = 1.564 fF/um^2, measured on the
+* 400 x 400 um plate of Test_capacitance (250.2 pF).  Size the plate with the
+* cap_mim PCell - it will solve W and L for a capacitance you ask for - and
+* copy the dimensions here.
+}
+G {}
+K {type=capacitor
+format="@spiceprefix@name @pinlist @model W=@W L=@L"
+lvs_format="@spiceprefix@name @pinlist @model W=@W L=@L"
+template="name=C1
+W=160.64u
+L=160.64u
+model=cap_mim
+spiceprefix=X
+"
+}
+V {}
+S {}
+E {}
+L 4 0 5 0 30 {}
+L 4 0 -30 0 -5 {}
+L 4 -10 -5 10 -5 {}
+L 4 -10 5 10 5 {}
+B 5 -2.5 -32.5 2.5 -27.5 {name=p dir=inout}
+B 5 -2.5 27.5 2.5 32.5 {name=m dir=inout}
+T {p} -8 -25 0 1 0.15 0.15 {layer=7}
+T {m} -8 17.5 0 1 0.15 0.15 {layer=7}
+T {@name} 15 -18.75 0 0 0.2 0.2 {}
+T {@model} 15 -6.25 0 0 0.2 0.2 {}
+T {W=@W L=@L} 15 6.25 0 0 0.2 0.2 {}

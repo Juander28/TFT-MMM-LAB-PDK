@@ -85,7 +85,9 @@ igzo.space(5.um).output(
 
 # --- the device ---------------------------------------------------------------
 # The gate must reach over both electrodes, or part of the channel is ungated.
-gate_ov.width(5.um).output(
+# Only where there is a channel: a coil crossing its own underpass also puts
+# gate metal over S/D metal, and that overlap is a crossing, not a transistor.
+gate_ov.interacting(channel).width(5.um).output(
   "GATE.3", "Gate overlap of the S/D electrode < 5 um per side")
 # The Au has to land on enough semiconductor.  Note what is NOT checked here:
 # an enclosure rule.  The electrodes deliberately run off the island on their

@@ -70,3 +70,26 @@ Cgs g  si 'cox_area*ov*W'
 .subckt cap_mim p m W=400u L=400u
 C1 p m 'cox_area*W*L'
 .ends cap_mim
+
+*************************************************************************
+** ind_igzo - the planar inductor
+**   XL1 a b ind_igzo ls=16.38n rs=375.8
+**
+** Series L and series R, and that is all.  Both values come from the
+** ind_igzo PCell, which computes them from the drawn geometry with
+** tools/coil_core.py and prints them on the cell; there is nothing to derive
+** here, so nothing is derived here.
+**
+** WHAT THIS MODEL DOES NOT HAVE: capacitance to anything, and therefore no
+** self-resonance.  Above the frequency where the coil's own capacitance
+** matters this is not a model of an inductor, it is a model of L and R.
+**
+** WHAT THE NUMBERS SAY: at the 50 nm of gold the process is assumed to have,
+** an 8-turn 100 um coil is 16.4 nH with 376 ohms of series resistance -
+** Q = 0.03 at 100 MHz.  Thicker metal is the only lever that moves it: the
+** same coil in 1 um of gold is 18.8 ohms, Q = 0.55.  Neither is a tank.
+*************************************************************************
+.subckt ind_igzo a b ls=16.38n rs=375.8
+L1 a mid 'ls'
+R1 mid b 'rs'
+.ends ind_igzo

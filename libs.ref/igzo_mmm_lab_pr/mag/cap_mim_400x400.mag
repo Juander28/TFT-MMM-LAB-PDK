@@ -1,6 +1,6 @@
 magic
 tech igzo_mmm_lab
-timestamp 1615919903
+timestamp 1615964164
 << checkpaint >>
 rect -40500 -40500 40500 20500
 << sdmet >>
@@ -14,4 +14,5 @@ rlabel sdmet s -1000 -31000 1000 -29000 4 MINUS
 port 1 nsew
 rlabel gatemet s 29000 -1000 31000 1000 4 PLUS
 port 3 nsew
+rlabel text s 0 0 0 0 4 cap_mim 250.2pF
 << end >>

@@ -13,6 +13,10 @@
 #   5. ngspice  - the model still reproduces the measured device
 #   6. magic    - GDS round-trip and device extraction
 #   7. netgen   - LVS between the magic layout and the xschem schematic
+#   8. klayout  - the capacitor sizes itself three ways and agrees with Cox
+#   9. klayout  - the inductor's estimate matches coil_core called directly
+#  10. magic    - a dielectric opening under gate metal really is a via
+#  11. ngspice  - TFT, capacitor and inductor together resonate where they should
 #
 # Exits non-zero on the first failure.
 set -e
@@ -143,6 +147,131 @@ netgen -batch lvs \
 grep -q "Circuits match uniquely" "${WORK}/lvs.out" \
     && pass "netgen LVS: layout and schematic match uniquely" \
     || { tail -30 "${WORK}/lvs.out"; fail "LVS"; }
+
+# --- 8. the capacitor sizes itself ------------------------------------------
+cat > "${WORK}/cap.py" <<'PY'
+import math
+import pya
+lib = pya.Library.library_by_name("igzo_mmm_lab_pr")
+decl = lib.layout().pcell_declaration("cap_mim")
+COX = 1.564                                   # fF/um^2, measured
+for params, want in (({"mode": "by dimensions", "w": 400.0, "l": 400.0}, 250240.0),
+                     ({"mode": "by area", "area_target": 160000.0}, 250240.0),
+                     ({"mode": "by capacitance", "c_target": 40362.0}, 40362.0)):
+    ly = pya.Layout(); ly.dbu = 0.001
+    cell = ly.cell(ly.add_pcell_variant(lib, decl.id(), params))
+    g = pya.Region(cell.begin_shapes_rec(ly.layer(pya.LayerInfo(2, 0)))).merged()
+    d = pya.Region(cell.begin_shapes_rec(ly.layer(pya.LayerInfo(6, 0)))).merged()
+    x = (g & d).bbox().to_dtype(ly.dbu)
+    got = COX * x.width() * x.height()
+    assert abs(got - want) / want < 0.001, "%s: drew %g fF, asked for %g" % (
+        params["mode"], got, want)
+    assert cell.shapes(ly.layer(63, 0)).size() == 1, "no value printed on the cell"
+print("cap_mim: all three sizing modes agree with Cox")
+PY
+KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" \
+    "${KLAYOUT}" -z -nc -r "${WORK}/cap.py" > "${WORK}/cap.log" 2>&1 \
+    && grep -q "all three sizing modes" "${WORK}/cap.log" \
+    && pass "klayout cap_mim: by dimensions, by area and by capacitance agree" \
+    || { cat "${WORK}/cap.log"; fail "cap_mim sizing"; }
+
+# --- 9. the inductor's estimate ---------------------------------------------
+cat > "${WORK}/ind.py" <<'PY'
+import os
+import sys
+import pya
+root = os.environ["PDKPATH"]
+sys.path.insert(0, os.path.join(root, "tools"))
+sys.path.insert(0, os.path.join(root, "libs.tech", "klayout", "tech", "pymacros"))
+import coil_core as cc
+from cells.draw_ind import path_length, spiral_with_leads
+
+lib = pya.Library.library_by_name("igzo_mmm_lab_pr")
+decl = lib.layout().pcell_declaration("ind_igzo")
+ly = pya.Layout(); ly.dbu = 0.001
+cell = ly.cell(ly.add_pcell_variant(lib, decl.id(),
+                                    {"shape": "square", "topology": "series"}))
+txt = [s.text.string for s in cell.shapes(ly.layer(63, 0)).each()]
+assert txt and "nH" in txt[0], "the coil did not print its value: %s" % txt
+
+# the same geometry through coil_core directly
+want = cc.inductance_microcoil(100e-6, 10e-6, 5e-6, 8, 50e-9, "cuadrada", "mohan")
+got = float(txt[0].split()[1].replace("nH", "")) * 1e-9
+assert abs(got - want) / want < 0.01, "PCell says %g H, coil_core says %g H" % (got, want)
+
+# the drawn track and the length the estimate used are the same track
+drawn = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0))
+assert drawn > 7000.0, "drawn length looks wrong: %g um" % drawn
+print("ind_igzo: %.2f nH, %.0f um of track, matches coil_core" % (got * 1e9, drawn))
+PY
+KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" PDKPATH="${PDKPATH}" \
+    "${KLAYOUT}" -z -nc -r "${WORK}/ind.py" > "${WORK}/ind.log" 2>&1 \
+    && grep -q "matches coil_core" "${WORK}/ind.log" \
+    && pass "klayout ind_igzo: $(grep -o 'ind_igzo: .*' "${WORK}/ind.log")" \
+    || { cat "${WORK}/ind.log"; fail "ind_igzo estimate"; }
+
+# --- 10. the via ------------------------------------------------------------
+python3 - "${WORK}/viatest.gds" <<'PY'
+import sys
+import pya
+ly = pya.Layout(); ly.dbu = 0.001
+def box(c, l, d, x1, y1, x2, y2):
+    c.shapes(ly.layer(l, d)).insert(pya.Box(*[int(v * 1000) for v in (x1, y1, x2, y2)]))
+def text(c, l, d, t, x, y):
+    tt = pya.Text(t, pya.Trans(int(x * 1000), int(y * 1000))); tt.size = 8000
+    c.shapes(ly.layer(l, d)).insert(tt)
+for name, with_via in (("via_yes", True), ("via_no", False)):
+    c = ly.create_cell(name)
+    box(c, 6, 0, -120, -15, 15, 15)
+    box(c, 2, 0, -15, -120, 15, 15)
+    if with_via:
+        box(c, 5, 0, -5, -5, 5, 5)
+    text(c, 6, 10, "A", -100, 0)
+    text(c, 2, 10, "B", 0, -100)
+ly.write(sys.argv[1])
+PY
+( cd "${WORK}" && magic -dnull -noconsole -nowrapper \
+    -rcfile "${PDKPATH}/libs.tech/magic/igzo_mmm_lab.magicrc" <<TCL > via.log 2>&1
+drc off
+gds read ${WORK}/viatest.gds
+load via_yes
+extract all
+ext2spice lvs
+ext2spice -o ${WORK}/via_yes.spice
+load via_no
+extract all
+ext2spice lvs
+ext2spice -o ${WORK}/via_no.spice
+quit -noprompt
+TCL
+)
+grep -q "^.subckt via_yes B$" "${WORK}/via_yes.spice" \
+    && grep -q "^.subckt via_no A B$" "${WORK}/via_no.spice" \
+    && pass "magic: an opening under gate metal is a via, without it two nets" \
+    || { grep "^.subckt" "${WORK}"/via_*.spice; fail "the via"; }
+
+# --- 11. the three cells together -------------------------------------------
+( cd "${WORK}" && xschem -n -q --rcfile "${WORK}/xschemrc" \
+    "${ROOT}/libs.tech/xschem/tests/tank_ac.sch" >> "${WORK}/xschem.log" 2>&1 ) || true
+python3 - "${WORK}/tank_ac.spice" "${WORK}" <<'PY'
+import re
+import subprocess
+import sys
+net = open(sys.argv[1]).read().replace(
+    "write tank_ac.raw\nprint v(out) > /dev/null",
+    "meas ac vmax MAX vdb(out)\nmeas ac fpeak WHEN vdb(out)=vmax")
+run = sys.argv[2] + "/tank_run.spice"
+open(run, "w").write(net)
+out = subprocess.run(["ngspice", "-b", run], capture_output=True, text=True,
+                     timeout=300)
+m = re.search(r"fpeak\s*=\s*([-\d.eE+]+)", out.stdout + out.stderr)
+assert m, "the tank sweep did not run"
+f = float(m.group(1)) / 1e6
+assert 95.0 < f < 105.0, "tank peaks at %g MHz, expected 100" % f
+print("tank: TFT + cap_mim + ind_igzo resonate at %.1f MHz" % f)
+PY
+[ $? -eq 0 ] && pass "ngspice: the three cells together resonate at 100 MHz" \
+             || fail "the tank testbench"
 
 echo
 echo "All checks passed."

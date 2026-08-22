@@ -1,0 +1,47 @@
+v {xschem version=3.4.5 file_version=1.2
+
+* Planar inductor - UCI/INRF IGZO TFT process
+*
+* Drawing after xschem's own devices/ind.sym (GPL-2.0, Stefan Frederik
+* Schippers); the electrical part is this process.
+*
+* Two pins, in the order the subcircuit declares them:
+*     .subckt ind_igzo a b
+*
+* ls and rs are series inductance and series resistance.  They are NOT derived
+* from anything here: the ind_igzo PCell computes them from the geometry you
+* draw - shape, turns, width, gap, metal thickness - and prints them on the
+* cell.  Copy them across.  Two consequences worth knowing before trusting a
+* simulation with this symbol in it:
+*
+*   - rs at 50 nm of gold is hundreds of ohms, which is why Q comes out near
+*     0.03 at 100 MHz.  The lever is metal thickness.
+*   - there is no parasitic capacitance and no self-resonance in this model.
+*     It is L in series with R, and nothing else.
+}
+G {}
+K {type=inductor
+format="@spiceprefix@name @pinlist @model ls=@ls rs=@rs"
+lvs_format="@spiceprefix@name @pinlist @model ls=@ls rs=@rs"
+template="name=L1
+ls=16.38n
+rs=375.8
+model=ind_igzo
+spiceprefix=X
+"
+}
+V {}
+S {}
+E {}
+L 4 0 22.5 0 30 {}
+L 4 0 -30 0 -22.5 {}
+B 5 -2.5 -32.5 2.5 -27.5 {name=a dir=inout}
+B 5 -2.5 27.5 2.5 32.5 {name=b dir=inout}
+A 4 0 15 7.5 90 180 {}
+A 4 0 0 7.5 90 180 {}
+A 4 0 -15 7.5 90 180 {}
+T {a} -12 -25 0 1 0.15 0.15 {layer=7}
+T {b} -12 17.5 0 1 0.15 0.15 {layer=7}
+T {@name} 15 -18.75 0 0 0.2 0.2 {}
+T {@model} 15 -6.25 0 0 0.2 0.2 {}
+T {ls=@ls rs=@rs} 15 6.25 0 0 0.2 0.2 {}
