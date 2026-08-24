@@ -43,6 +43,7 @@ shot("cap_mim_400x400", "klayout_cap.png")
 shot("tft_igzo_l160w1000", "klayout_tft_big.png")
 
 # the passives
+shot("tft_igzo_l10w100_nf4_strapped", "klayout_tft_straps.png")
 shot("cap_mim_40p36", "klayout_cap_40p36.png")
 shot("ind_igzo_square_series", "klayout_ind_sq_series.png")
 shot("ind_igzo_circular_series", "klayout_ind_ci_series.png")
