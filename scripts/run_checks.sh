@@ -239,6 +239,15 @@ for shape in ("square", "circular"):
     n = pieces("ind_igzo", {"shape": shape, "topology": "series"}, (6, 0))
     assert n == 1, "%s spiral: underpass in %d pieces" % (shape, n)
 
+# A folded transistor is nf+1 separate electrodes until the straps tie them
+# together; strapped, it must be exactly two - source and drain.
+for nf in (2, 4, 5):
+    loose = pieces("tft_igzo", {"nf": nf}, (6, 0))
+    assert loose == nf + 1, "nf=%d: %d electrodes, expected %d" % (nf, loose, nf + 1)
+    tied = pieces("tft_igzo", {"nf": nf, "s_strap_w": 20.0, "d_strap_w": 20.0},
+                  (6, 0))
+    assert tied == 2, "nf=%d strapped: %d S/D nets, expected 2" % (nf, tied)
+
 # The capacitor's plates are one piece each, extensions and pads included.
 for params in ({}, {"pad": True}, {"ext_sd_far": 100.0, "ext_gate_far": 100.0}):
     for layer, what in (((2, 0), "gate plate"), ((6, 0), "S/D plate")):

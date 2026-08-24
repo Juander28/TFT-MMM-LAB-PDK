@@ -71,6 +71,12 @@ class tft_igzo(pya.PCellDeclarationHelper):
                    default=TFT_IGZO_EXT_Y, unit="um")
         self.param("gate_ext_y", self.TypeDouble, "Gate past IGZO",
                    default=TFT_GATE_EXT_Y, unit="um")
+        self.param("s_strap_w", self.TypeDouble,
+                   "Source strap width (0 = none)", default=0.0, unit="um")
+        self.param("d_strap_w", self.TypeDouble,
+                   "Drain strap width (0 = none)", default=0.0, unit="um")
+        self.param("strap_gap", self.TypeDouble, "Strap clearance from the gate",
+                   default=10.0, unit="um")
         self.param("pad", self.TypeBoolean, "Probe Pads", default=False)
         self.param("pad_size", self.TypeDouble, "Pad Size",
                    default=TFT_PAD, unit="um")
@@ -97,6 +103,9 @@ class tft_igzo(pya.PCellDeclarationHelper):
         self.w_gate = max(1.0, self.w_gate)
         self.l_gate = max(1.0, self.l_gate)
         self.gate_ov = max(0.0, self.gate_ov)
+        self.s_strap_w = max(0.0, self.s_strap_w)
+        self.d_strap_w = max(0.0, self.d_strap_w)
+        self.strap_gap = max(0.0, self.strap_gap)
         self.sd_len = max(1.0, self.sd_len)
         # The island has to reach over both electrodes, or there is no channel.
         self.igzo_ext_x = max(0.5, self.igzo_ext_x)
@@ -115,6 +124,9 @@ class tft_igzo(pya.PCellDeclarationHelper):
             igzo_ext_x=self.igzo_ext_x,
             igzo_ext_y=self.igzo_ext_y,
             gate_ext_y=self.gate_ext_y,
+            s_strap_w=self.s_strap_w,
+            d_strap_w=self.d_strap_w,
+            strap_gap=self.strap_gap,
             pad=self.pad,
             pad_size=self.pad_size,
             pad_gap=self.pad_gap,

@@ -56,6 +56,14 @@ def main():
                 {"l_gate": float(length), "w_gate": float(width),
                  "pad": False, "lbl": True})
             count += 1
+    # A folded device with its fingers strapped: four fingers, a wide source
+    # strap and a narrower drain strap.  Without straps a folded device is
+    # nf+1 separate terminals, which is a layout mistake waiting to happen.
+    add(layout, lib, "tft_igzo", "tft_igzo_l10w100_nf4_strapped",
+        {"l_gate": 10.0, "w_gate": 100.0, "nf": 4, "s_strap_w": 40.0,
+         "d_strap_w": 20.0, "lbl": True})
+    count += 1
+
     # The device as it is drawn on the test chip, probe pads and all.
     add(layout, lib, "tft_igzo", "tft_igzo_l10w100_pad",
         {"l_gate": 10.0, "w_gate": 100.0, "pad": True, "lbl": True})

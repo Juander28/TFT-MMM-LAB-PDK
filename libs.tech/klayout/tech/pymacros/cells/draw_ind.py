@@ -225,18 +225,24 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     # One on the outer lead, one on the inner terminal's exit.  Both on the
     # coil's own metal: at the exit the gate already reaches down to the
     # underpass through the via, so the pad lands on the metal that is on top.
+    # The pads overlap the track they sit on by a full track width instead of
+    # butting against it.  A butt joint is electrically fine on a drawing and
+    # a knife edge in silicon: it is the whole connection resting on the mask
+    # landing exactly where it was drawn.  One track width of overlap costs
+    # nothing and removes the dependency.
     if pad:
         half_p = pad_size / 2.0
-        _box(cell, coil_layer, x_out + lead, -half_p,
-             x_out + lead + pad_size, half_p)
-        _box(cell, coil_layer, x_exit - pad_size, -half_p, x_exit, half_p)
+        x_a = x_out + lead - w
+        _box(cell, coil_layer, x_a, -half_p, x_a + pad_size, half_p)
+        x_b = x_exit + w
+        _box(cell, coil_layer, x_b - pad_size, -half_p, x_b, half_p)
 
     # Terminals.  Without these the extracted coil has no named nodes, and
     # neither LVS nor a resistance extraction has anything to report.
     if lbl:
         size = grid(min(w, 2.0 * pad_out))
-        x_a = x_out + lead + (pad_size / 2.0 if pad else -w)
-        x_b = x_exit - (pad_size / 2.0 if pad else 0.0)
+        x_a = x_out + lead + (pad_size / 2.0 - w if pad else -w)
+        x_b = x_exit - (pad_size / 2.0 - w if pad else 0.0)
         _pin(cell, on_gate, "A", x_a, 0.0, size)
         _pin(cell, on_gate, "B", x_b, 0.0, size)
 
@@ -322,17 +328,18 @@ def draw_rings(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
         half_p = pad_size / 2.0
         for sign in (1.0, -1.0):
             y_c = sign * (slot + half_p - w / 2.0)
-            _box(cell, coil_layer, x_end, y_c - half_p, x_end + pad_size,
-                 y_c + half_p)
-            _box(cell, coil_layer, x_end, min(y_c, sign * slot) - w / 2.0,
-                 x_end + w, max(y_c, sign * slot) + w / 2.0)
+            # a track width of overlap onto the bus, for the same reason
+            _box(cell, coil_layer, x_end - w, y_c - half_p,
+                 x_end - w + pad_size, y_c + half_p)
+            _box(cell, coil_layer, x_end - w, min(y_c, sign * slot) - w / 2.0,
+                 x_end, max(y_c, sign * slot) + w / 2.0)
 
     if lbl:
         size = grid(min(w, 20.0))
         for name, sign in (("A", 1.0), ("B", -1.0)):
             if pad:
                 y_c = sign * (slot + pad_size / 2.0 - w / 2.0)
-                _pin(cell, on_gate, name, x_end + pad_size / 2.0, y_c, size)
+                _pin(cell, on_gate, name, x_end - w + pad_size / 2.0, y_c, size)
             else:
                 _pin(cell, on_gate, name, x_end - w, sign * slot, size)
 

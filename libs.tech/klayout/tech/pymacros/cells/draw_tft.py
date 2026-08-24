@@ -81,6 +81,9 @@ def draw_tft(
     pad_size=400.0,
     pad_gap=325.0,
     etch_inset=20.0,
+    s_strap_w=0.0,
+    d_strap_w=0.0,
+    strap_gap=10.0,
     lbl=False,
 ):
     """
@@ -129,6 +132,42 @@ def draw_tft(
         bus_y2 = gate_y2 + gate_ext_y
         _box(cell, GATE, bus_x1, bus_y1, bus_x2, gate_y1)
         _box(cell, GATE, bus_x1, gate_y2, bus_x2, bus_y2)
+
+    # --- source and drain straps --------------------------------------------
+    # Fingers share electrodes, so the electrodes alternate: even ones are
+    # source, odd ones drain.  Left unconnected they are nf+1 separate
+    # terminals; the straps are what make them two.
+    #
+    # Each strap runs outside the gate, on the S/D metal, and the electrodes it
+    # serves are extended to reach it.  Their widths are separate parameters
+    # because the two sides rarely carry the same current: in a common-source
+    # stage the source strap carries every finger's current and the drain strap
+    # carries it back out, but in a differential pair the source side is the
+    # tail and wants to be much wider.  Zero on either one leaves that side
+    # unstrapped, which is what a single-finger device wants.
+    #
+    # THE SOURCE SIDE CROSSES THE GATE BUS.  With more than one finger the gate
+    # stripes have to be tied together too, and its bus runs along the bottom -
+    # the same side the source strap leaves from.  The two are on different
+    # metals with the dielectric between them, so it is a capacitance, not a
+    # short: about Cox * (electrode width) * (bus width) per source electrode.
+    # The drain side, at the top, crosses nothing.
+    strap_y_s = bus_y1 - strap_gap - s_strap_w / 2.0
+    strap_y_d = bus_y2 + strap_gap + d_strap_w / 2.0
+    if s_strap_w > 0.0:
+        for i in range(0, len(electrodes), 2):
+            xa, xb = electrodes[i]
+            _box(cell, SD, xa, strap_y_s, xb, -half_w)
+        _box(cell, SD, electrodes[0][0], strap_y_s - s_strap_w / 2.0,
+             electrodes[-1 if len(electrodes) % 2 else -2][1],
+             strap_y_s + s_strap_w / 2.0)
+    if d_strap_w > 0.0 and len(electrodes) > 1:
+        for i in range(1, len(electrodes), 2):
+            xa, xb = electrodes[i]
+            _box(cell, SD, xa, half_w, xb, strap_y_d)
+        _box(cell, SD, electrodes[1][0], strap_y_d - d_strap_w / 2.0,
+             electrodes[-1 if len(electrodes) % 2 == 0 else -2][1],
+             strap_y_d + d_strap_w / 2.0)
 
     # --- probe pads ---------------------------------------------------------
     # 400 x 400 um, placed as on the test chip: the source and drain pads butt
