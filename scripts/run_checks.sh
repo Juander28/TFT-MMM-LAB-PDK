@@ -10,7 +10,8 @@
 #   2. klayout  - the technology and the PCell library are discoverable
 #   3. klayout  - DRC on the generated primitives
 #   4. xschem   - the symbol netlists with the pins in the right order
-#   5. ngspice  - the model still reproduces the measured device
+#   5. ngspice  - the model still reproduces the measured device, is symmetric
+#                 in d and s, and carries a magnetic-field term
 #   6. magic    - GDS round-trip and device extraction
 #   7. netgen   - LVS between the magic layout and the xschem schematic
 #   8. klayout  - the capacitor sizes itself three ways and agrees with Cox
@@ -108,6 +109,49 @@ python3 - "${ID}" <<'PY' && pass "ngspice reproduces the measured device (${ID} 
 import sys
 i = abs(float(sys.argv[1]))
 assert 6.4e-4 < i < 6.7e-4, "Id = %g A, expected about 654 uA" % i
+PY
+
+# --- 5b. the device is symmetric, and the magnetic-field term is present ----
+cat > "${WORK}/sym.spice" <<SP
+* The same device wired both ways round, and the same device in a field.
+.include ${PDKPATH}/libs.tech/ngspice/design.ngspice
+.lib ${PDKPATH}/libs.tech/ngspice/igzo_mmm_lab.ngspice best
+XA hi g 0 igzo_tft W=1000u L=8u ov=5u
+XB 0 g hi2 igzo_tft W=1000u L=8u ov=5u
+XC hi3 g 0 igzo_tft W=1000u L=8u ov=5u B=1
+Vhi hi 0 10
+Vhi2 hi2 0 10
+Vhi3 hi3 0 10
+Vg g 0 6
+.options reltol=1e-10 abstol=1e-16
+.op
+.control
+run
+print i(Vhi) i(Vhi2) i(Vhi3)
+.endc
+.end
+SP
+ngspice -b "${WORK}/sym.spice" > "${WORK}/sym.log" 2>&1
+python3 - "${WORK}/sym.log" <<'PY' && pass "ngspice: source and drain are interchangeable, B is present and classical" || fail "device symmetry"
+import re
+import sys
+txt = open(sys.argv[1]).read()
+vals = {}
+for name in ("vhi", "vhi2", "vhi3"):
+    m = re.search(r"i\(%s\)\s*=\s*(\S+)" % name, txt)
+    assert m, "no current for %s: %s" % (name, txt)
+    vals[name] = abs(float(m.group(1)))
+normal, swapped, in_field = vals["vhi"], vals["vhi2"], vals["vhi3"]
+# 1. A TFT has no bulk: the two channel terminals are the same terminal.
+assert abs(normal - swapped) / normal < 1e-9, (
+    "d and s are not interchangeable: %.6g A one way, %.6g A the other"
+    % (normal, swapped))
+# 2. The field term exists and is classical, which means it is negligible:
+#    at 4.6 cm^2/Vs, (mu*B)^2 at one tesla is 2e-7.
+rel = abs(normal - in_field) / normal
+assert rel < 1e-5, "B = 1 T moved the current by %.2e - that is not classical" % rel
+print("symmetric to %.0e, and B = 1 T moves the current by %.1e" %
+      (abs(normal - swapped) / normal, rel))
 PY
 
 # --- 6. magic: round-trip and extraction -------------------------------------

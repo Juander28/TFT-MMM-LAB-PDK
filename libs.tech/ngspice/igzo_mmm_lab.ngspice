@@ -32,6 +32,17 @@
 * Vto is near zero and slightly negative on many devices (depletion-like),
 * which is normal for unpassivated IGZO.
 *
+* THERE IS NO BULK.  Is, Js and every junction capacitance are zeroed on all
+* four cards, which leaves the intrinsic device's substrate terminal with no
+* path to anywhere.  That is what makes the transistor SYMMETRIC: source and
+* drain are interchangeable, as they are in a real TFT, and a device drawn
+* with its source on the high side behaves exactly like one drawn the other
+* way round.  Before this, the bulk-drain junction of a device wired "backwards"
+* conducted, and the same device read 654 uA one way and 1414 uA the other.
+* Verified across all four corners, in the linear region, in saturation and
+* near threshold: with tight solver tolerances the two orientations agree
+* exactly.
+*
 * CGSO/CGDO ARE ZERO HERE ON PURPOSE.  The overlap capacitance is not a
 * property of the process alone - it is Cox times the drawn gate overlap - so
 * the igzo_tft wrapper in design.ngspice puts it in as explicit capacitors
@@ -58,23 +69,39 @@
 * --- typical ---------------------------------------------------------------
 .lib tt
 .model IGZO_TFT NMOS (Level=1 Vto=-0.26 Kp=0.562u Lambda=0.0142
-+  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0
++  Is=0 Js=0 Cbd=0 Cbs=0 Cj=0 Cjsw=0)
+* Mobility of this corner, Kp/Cox, in m^2/Vs.  The magnetic-field
+* term in igzo_tft needs it, and it belongs with the Kp it came from.
+.param mu_corner = 0.0003593
 .endl tt
 
 * --- best case -------------------------------------------------------------
 .lib best
 .model IGZO_TFT NMOS (Level=1 Vto=0.09 Kp=0.717u Lambda=0.0067
-+  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0
++  Is=0 Js=0 Cbd=0 Cbs=0 Cj=0 Cjsw=0)
+* Mobility of this corner, Kp/Cox, in m^2/Vs.  The magnetic-field
+* term in igzo_tft needs it, and it belongs with the Kp it came from.
+.param mu_corner = 0.0004584
 .endl best
 
 * --- short channel, contact-limited ----------------------------------------
 .lib short
 .model IGZO_TFT NMOS (Level=1 Vto=-1.32 Kp=0.128u Lambda=0.0659
-+  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0
++  Is=0 Js=0 Cbd=0 Cbs=0 Cj=0 Cjsw=0)
+* Mobility of this corner, Kp/Cox, in m^2/Vs.  The magnetic-field
+* term in igzo_tft needs it, and it belongs with the Kp it came from.
+.param mu_corner = 8.184e-05
 .endl short
 
 * --- worst case over all three chips ---------------------------------------
 .lib all
 .model IGZO_TFT NMOS (Level=1 Vto=-0.53 Kp=0.381u Lambda=0.0355
-+  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0)
++  Tox=22.1n Cgso=0 Cgdo=0 Cgbo=0
++  Is=0 Js=0 Cbd=0 Cbs=0 Cj=0 Cjsw=0)
+* Mobility of this corner, Kp/Cox, in m^2/Vs.  The magnetic-field
+* term in igzo_tft needs it, and it belongs with the Kp it came from.
+.param mu_corner = 0.0002436
 .endl all

@@ -18,11 +18,12 @@
 +  cox_area = 1.564e-3   $ F/m^2   50 nm Al2O3, from the 400x400 um plate
 +  rc_w     = 3.3        $ Ohm*m   per contact; 2*Rc*W = 6.6e6 Ohm*um at VGS=6V
 +  l_bias   = 3e-6       $ m       drawn-to-printed bias, ONE sample - see below
++  mu_corner = 3.593e-4  $ m^2/Vs  overridden by whichever corner is selected
 
 *************************************************************************
 ** igzo_tft - the device a schematic instantiates
 **
-**   XM1 d g s igzo_tft W=100u L=10u ov=5u nf=1 m=1
+**   XM1 d g s igzo_tft W=100u L=10u ov=5u nf=1 m=1 B=0
 **
 ** m is ngspice's own subcircuit multiplier - it is not declared as a
 ** parameter here, ngspice replicates the whole wrapper (device, contacts and
@@ -40,11 +41,38 @@
 **      overlap this is 7.82 fF per um of width, and it is the parasitic that
 **      decides whether a tuned stage works: it stops scaling with L, so fT
 **      flattens out as 1/L instead of 1/L^2.  Sweeping `ov` is the point.
-**   3. Three terminals, and only three.  A TFT has no body: it sits on glass.
-**      The intrinsic level-1 device still needs a bulk node, so the wrapper
-**      ties it to its own source and never exposes it.  Nothing outside the
-**      subcircuit can connect to it, which is the point - a bulk pin on a
-**      device that has no bulk is an invitation to wire it somewhere.
+**   3. Three terminals, and only three, and d and s are INTERCHANGEABLE.
+**      A TFT has no body: it sits on glass, and its two channel terminals are
+**      the same kind of terminal.  The intrinsic level-1 device still carries
+**      a substrate node, but every junction on it is dead (Is=0, Cj=0 on all
+**      four corner cards), so it has no path to anywhere and the device is
+**      symmetric.  Swap d and s in a netlist and nothing changes.
+**
+**      This was not true before, and it mattered: with the bulk diodes alive,
+**      a device wired with its source on the high side forward-biased its
+**      bulk-drain junction and passed 1414 uA where the same device the other
+**      way round passed 654 uA.  Every device in an amplifier had to be
+**      oriented by hand to avoid it.  That rule is now unnecessary.
+**
+**   4. A magnetic field, B, in tesla, default zero.
+**      Classical magnetoresistance: a field across the channel bends the
+**      carrier paths and the effective mobility falls as mu/(1+(mu*B)^2).
+**      That enters the current as W/(1+(mu*B)^2) - which is the same thing,
+**      since level 1 puts mobility and width in the same product - and leaves
+**      the threshold, the contact resistance and the overlap capacitances
+**      alone, which is where the physics leaves them too.
+**
+**      READ THIS BEFORE USING IT AS A SENSOR.  At the measured mobility of
+**      4.6 cm^2/Vs, mu*B at one tesla is 4.6e-4, so the effect is (mu*B)^2 =
+**      2e-7: two parts in ten million.  Classical magnetoresistance in this
+**      material is not measurable and cannot be the basis of a sensor.  If
+**      the laboratory measures a change in Kp under a field - and it reports
+**      that it does - then whatever causes it is NOT this term, and the
+**      mechanism is worth finding before it is worth modelling.  b_scale is
+**      the hook: set it to the ratio between the measured effect and the
+**      classical one and the model will reproduce the measurement, with the
+**      number that says how far from classical the result is sitting in
+**      plain sight in the netlist.  See docs/bibliography/.
 **
 ** nf is carried for layout and LVS only.  Fingering does NOT change gm or
 ** fT - measured, and confirmed in simulation for nf = 1..20 at constant total
@@ -54,10 +82,13 @@
 ** That is one sample of one cell, so it is not applied here; if you want the
 ** printed device, pass the printed L yourself.
 *************************************************************************
-.subckt igzo_tft d g s W=100u L=10u ov=5u nf=1
+.subckt igzo_tft d g s W=100u L=10u ov=5u nf=1 B=0 b_scale=1
+* Classical magnetoresistance.  mr = 1 at B = 0, so a netlist that says
+* nothing about magnetic fields behaves exactly as it did before this existed.
+.param mr = '1 + (mu_corner * b_scale * B) * (mu_corner * b_scale * B)'
 Rd  d  di 'rc_w/W'
 Rs  s  si 'rc_w/W'
-M1  di g  si si IGZO_TFT W='W' L='L'
+M1  di g  si si IGZO_TFT W='W/mr' L='L'
 Cgd g  di 'cox_area*ov*W'
 Cgs g  si 'cox_area*ov*W'
 .ends igzo_tft

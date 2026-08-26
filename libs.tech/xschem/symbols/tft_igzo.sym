@@ -5,10 +5,15 @@ v {xschem version=3.4.5 file_version=1.2
 * Adapted from gf180mcuD/libs.tech/xschem/symbols/nfet_10v0_asym.sym
 * (Apache-2.0, GlobalFoundries PDK Authors).
 *
-* THREE TERMINALS.  A TFT sits on glass and has no body, so there is no bulk
-* pin to bring out: the wrapper subcircuit ties the intrinsic device's bulk to
-* its own source and keeps it inside.  A bulk pin on a device with no bulk is
-* an invitation to wire it somewhere.
+* THREE TERMINALS, AND D AND S ARE INTERCHANGEABLE.  A TFT sits on glass and
+* has no body, so there is no bulk pin to bring out - and every junction
+* inside the wrapper is dead, so which way round you draw the device makes no
+* difference, as in the real thing.  There is no orientation rule to remember.
+*
+* B is a magnetic field in tesla, zero by default.  Read the note in
+* design.ngspice before using it for anything: classical magnetoresistance at
+* this mobility is two parts in ten million per tesla, and b_scale is the
+* knob that lets a measured effect drive the model instead.
 *
 * The pin boxes below are declared in the order D, G, S, and @pinlist expands
 * in exactly that order - it must match
@@ -22,7 +27,7 @@ v {xschem version=3.4.5 file_version=1.2
 }
 G {}
 K {type=nmos
-format="@spiceprefix@name @pinlist @model W=@W L=@L ov=@ov nf=@nf m=@m"
+format="@spiceprefix@name @pinlist @model W=@W L=@L ov=@ov nf=@nf m=@m B=@B b_scale=@b_scale"
 lvs_format="@spiceprefix@name @pinlist @model W=@W L=@L nf=@nf m=@m"
 template="name=M1
 W=100u
@@ -30,6 +35,8 @@ L=10u
 ov=5u
 nf=1
 m=1
+B=0
+b_scale=1
 model=igzo_tft
 spiceprefix=X
 "
