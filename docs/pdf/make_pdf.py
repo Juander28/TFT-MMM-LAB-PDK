@@ -82,7 +82,7 @@ Circuits match uniquely.""",
     "spice": """.include $PDK_ROOT/$PDK/libs.tech/ngspice/design.ngspice
 .lib     $PDK_ROOT/$PDK/libs.tech/ngspice/igzo_mmm_lab.ngspice tt
 
-XM1 d g s b igzo_tft W=100u L=10u ov=5u""",
+XM1 d g s igzo_tft W=100u L=10u ov=5u""",
     "validation": {
         "en": """W = 1000 um, L = 8 um, VGS = 6 V, VDS = 10 V
     simulated   654.4 uA

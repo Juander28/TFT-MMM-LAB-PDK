@@ -137,8 +137,20 @@ EN = {
         ["W, L", "drawn width and length, in metres"],
         ["ov", "gate overlap per side; sets the overlap capacitance, Cox*ov*W"],
         ["nf", "carried for LVS only - it changes nothing electrically"],
+        ["B", "magnetic field in tesla, default 0 - see below"],
+        ["b_scale", "dimensionless, default 1: how much larger than classical"],
         ["corner", "chosen by the .lib line, not by the instance"],
     ],
+    "h_sym": "Three terminals, and no wrong way round",
+    "sym_txt":
+        "d, g, s - there is no bulk pin, and the intrinsic device's substrate node\n"
+        "reaches nothing: every junction on every model card is inert.  So the\n"
+        "device is symmetric, and swapping d and s changes no number anywhere.\n"
+        "Draw the stage the way it reads best.\n\n"
+        "B carries classical magnetoresistance, mu/(1+(mu*b_scale*B)^2), with mu\n"
+        "from the corner's own Kp/Cox.  At our mobility that is 2e-7 per tesla -\n"
+        "present, honest, and unmeasurable.  docs/bibliography/ says why, and what\n"
+        "to set b_scale to when a real coefficient has been measured.",
     "h_cap": "cap_mim - the capacitor",
     "cap_txt":
         "Set the plate, or the area, or the capacitance - whichever the problem\n"
@@ -278,8 +290,21 @@ ES = {
         ["W, L", "ancho y largo dibujados, en metros"],
         ["ov", "solape de compuerta por lado; fija la capacitancia Cox*ov*W"],
         ["nf", "se lleva solo para LVS - no cambia nada electricamente"],
+        ["B", "campo magnetico en tesla, por defecto 0 - ver abajo"],
+        ["b_scale", "adimensional, por defecto 1: cuanto mayor que lo clasico"],
         ["esquina", "la elige la linea .lib, no la instancia"],
     ],
+    "h_sym": "Tres terminales, y ningun sentido equivocado",
+    "sym_txt":
+        "d, g, s - no hay pin de bulk, y el nodo de sustrato del dispositivo\n"
+        "intrinseco no llega a ninguna parte: todas las uniones de todas las\n"
+        "tarjetas de modelo estan inertes.  El dispositivo es simetrico, e\n"
+        "intercambiar d y s no cambia ningun numero.  Dibuja la etapa como mejor\n"
+        "se lea.\n\n"
+        "B lleva magnetorresistencia clasica, mu/(1+(mu*b_scale*B)^2), con mu del\n"
+        "propio Kp/Cox del corner.  Con nuestra movilidad eso es 2e-7 por tesla -\n"
+        "presente, honesto e inmedible.  docs/bibliography/ explica por que, y que\n"
+        "poner en b_scale cuando haya un coeficiente medido.",
     "h_cap": "cap_mim - el capacitor",
     "cap_txt":
         "Pon la placa, o el area, o la capacitancia - lo que te de el problema.\n"
@@ -503,9 +528,14 @@ def build(lang, out_dir=None):
         p.table(_tft_rows(src), widths=[0.17, 0.14, 0.50, 0.19])
         p.head(S["h_tftnote"])
         p.text(S["tftnote"])
-        p.head(S["h_model"])
+        p.close(n)
+
+        n += 1
+        p = Page(pdf, S["h_model"], kicker=S["k"], footer=S["footer"])
         p.text(S["model_txt"])
         p.table(S["model_rows"], widths=[0.24, 0.76])
+        p.head(S["h_sym"])
+        p.text(S["sym_txt"])
         p.close(n)
 
         n += 1
