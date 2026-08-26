@@ -147,6 +147,21 @@ def circular_spiral(d_in, w, gap, n, step_deg=2.0):
         theta += step
     r = a + pitch * (theta_end - math.pi) / (2.0 * math.pi)
     pts.append(_snap(r * math.cos(theta_end), r * math.sin(theta_end)))
+
+    # Straighten the first few microns of the run.  The terminal is capped
+    # square to the run it grows out of, and a width check compares that cap
+    # with every edge within its own limit - so a cap that is exactly square to
+    # the first segment is still reported against the second, which on a curve
+    # is a degree over.  Six microns of straight run puts the curve out of
+    # reach of the cap.  The straightened points are moved to whichever of them
+    # sits furthest in, never out, so the gap to the turn spiralling past can
+    # only grow.
+    head = 0
+    while head < len(pts) and pts[head][1] >= -6.0:
+        head += 1
+    if head > 1:
+        x_line = max(p[0] for p in pts[:head])
+        pts = [(x_line, p[1]) for p in pts[:head]] + pts[head:]
     return pts
 
 
@@ -159,7 +174,67 @@ def spiral_with_leads(d_in, w, gap, n, shape="square", lead=40.0):
     """
     pts = (square_spiral(d_in, w, gap, n) if shape == "square"
            else circular_spiral(d_in, w, gap, n))
+    # A short straight stub on the inner end, pointing into the coil's opening.  A track is capped square to its first segment,
+    # and on a circular coil that segment is tilted by half a step, so once the
+    # vertices are on the 20 nm grid the cap meets the outer edge a tenth of a
+    # degree off square - and a corner that is not exactly square is a width
+    # violation under a euclidian metric, at the one corner of the coil a
+    # reader looks at first.  A vertical stub makes it exactly square, and its
+    # cap is where the mouth of the terminal starts.  One micron is enough -
+    # the cap is square to the first segment however short it is - and it has
+    # to be short: a straight run at the inner end of a circular coil closes on
+    # the turn spiralling past it, about 80 nm of the gap per micron.
+    pts = [(pts[0][0], pts[0][1] + 1.0)] + pts
     return pts + [(pts[-1][0] + lead, pts[-1][1])]
+
+
+def _funnel(cell, li, x_track, w, x1, y_bot, half1):
+    """
+    The mouth that takes the coil's inner end into its via pad.
+
+    Three things decide its shape, and all three are DRC:
+
+    * it starts *inside* the track, at the centreline, so there is no seam
+      between the two - a mouth that begins at the end face butts against it;
+    * both edges lean the same way - the upper one inwards, the lower one
+      upwards - by more than the couple of degrees a circular track turns
+      through in one step.  Every corner where the mouth meets the track is
+      then obtuse.  Held horizontal and vertical they come out at 87-88 degrees
+      on a curve, and a corner just under a right angle is a spacing violation
+      under a euclidian metric;
+    * the lower edge never dips below the height it entered at, so the mouth
+      cannot flare back across the corner where the track turns away - the
+      notch that made a symmetric funnel fail on the square coil.
+    """
+    lean = w / 2.0
+    pts = [(x_track, -w / 2.0),            # buried in the track
+           (x1, y_bot),                    # ... leaning down on the way out
+           (x1, y_bot + 2.0 * half1),
+           (x_track + lean, w / 2.0)]      # ... and inwards on the way up
+    dbu = cell.layout().dbu
+    cell.shapes(layer(cell.layout(), li)).insert(pya.Polygon(
+        [pya.Point(int(round(px / dbu)), int(round(py / dbu))) for px, py in pts]))
+
+
+def _taper(cell, li, x0, half0, x1, half1, y0=0.0, y1=None):
+    """
+    A trapezoid from a cross-section of half-height half0 at x0 to half1 at x1,
+    centred on y0 at one end and on y1 at the other.
+
+    This is what makes a terminal read as connected: a track that ends beside
+    a square pad overlaps it by whatever the end cap happens to cover, and
+    looks - correctly - like something that does not quite touch.  A funnel
+    leaves the track at the track's own width and arrives at the pad at the
+    pad's, with metal all the way across.
+    """
+    if y1 is None:
+        y1 = y0
+    dbu = cell.layout().dbu
+    pts = [(x0, y0 - half0), (x1, y1 - half1),
+           (x1, y1 + half1), (x0, y0 + half0)]
+    poly = pya.Polygon([pya.Point(int(round(px / dbu)), int(round(py / dbu)))
+                        for px, py in pts])
+    cell.shapes(layer(cell.layout(), li)).insert(poly)
 
 
 def _pin(cell, on_gate, name, x, y, size):
@@ -207,7 +282,23 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     pad = via_w / 2.0 + via_enc
     via_in = max(5.0, min(via, w / 2.0))
     pad_in = via_in / 2.0 + via_enc
-    x_in = pts[0][0] + pad_in              # pad centre, shifted inwards
+    # The inner pad is shifted inwards and reached through a funnel, so the
+    # track flows into it instead of ending beside it.
+    #
+    # The funnel only opens upwards.  The track arrives at the centre running
+    # down the left side, so the metal below the funnel's mouth is the track
+    # itself: a funnel that widened both ways would flare straight past the
+    # corner where the track turns down and leave a slot a couple of microns
+    # wide between the two - a spacing violation, and the very thing this is
+    # meant to cure.  With the lower edge held flush against the end of the
+    # track that corner stays square, and the pad sits a little high instead.
+    x_track = pts[0][0]                    # the coil's inner end
+    x_taper = x_track + w / 2.0            # the track's inner edge
+    x_in = x_taper + pad_in * 2.0          # pad centre, clear of the track
+    # grid() keeps lengths positive, so the offsets are snapped and then signed
+    rise = w / 4.0                         # the lower edge climbs on its way out
+    y_bot = -grid(w / 2.0 - rise)          # the mouth's lower edge where it ends
+    y_in = y_bot + grid(pad_in)            # ... so the pad clears the track
     x_exit = -(x_out + lead)
 
     # Where the outer terminal ends up.  With a probe pad it is the middle of
@@ -225,9 +316,13 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     # The underpass runs from the inner end all the way to that via.
     _box(cell, under_layer, min(x_out_via - pad_out, x_exit - pad_out), -pad_out,
          x_in + pad_in, pad_out)
-    for x, vw, enc in ((x_in, via_in, pad_in), (x_out_via, via_out, pad_out)):
-        _box(cell, coil_layer, x - enc, -enc, x + enc, enc)
-        _box(cell, OXETCH, x - vw / 2.0, -vw / 2.0, x + vw / 2.0, vw / 2.0)
+    _box(cell, under_layer, x_in - pad_in, min(-pad_out, y_in - pad_in),
+         x_in + pad_in, max(pad_out, y_in + pad_in))
+    _funnel(cell, coil_layer, x_track, w, x_in - pad_in, y_bot, pad_in)
+    for x, y, vw, enc in ((x_in, y_in, via_in, pad_in),
+                          (x_out_via, 0.0, via_out, pad_out)):
+        _box(cell, coil_layer, x - enc, y - enc, x + enc, y + enc)
+        _box(cell, OXETCH, x - vw / 2.0, y - vw / 2.0, x + vw / 2.0, y + vw / 2.0)
 
     # --- probe pads ---------------------------------------------------------
     # Each pad swallows the track that feeds it: the outer lead runs on to the
