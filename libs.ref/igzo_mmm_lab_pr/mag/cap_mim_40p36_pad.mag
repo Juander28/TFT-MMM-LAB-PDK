@@ -1,8 +1,8 @@
 magic
 tech igzo_mmm_lab
-timestamp 1616182579
+timestamp 1616315358
 << checkpaint >>
-rect -20500 -106532 68532 20500
+rect -20500 -68532 68532 20500
 << sdmet >>
 rect -8032 -28032 8032 8032
 rect -20000 -68032 20000 -28032
@@ -12,7 +12,7 @@ rect -8032 -8032 68032 8032
 rect 28032 -20000 68032 -8032
 << oxetch >>
 rect -6032 -26032 6032 -10032
-rect -18000 -106032 18000 -70032
+rect -18000 -66032 18000 -30032
 << labels >>
 rlabel sdmet s -402 -48434 402 -47630 4 MINUS
 port 1 nsew

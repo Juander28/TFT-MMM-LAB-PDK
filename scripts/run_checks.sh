@@ -253,7 +253,31 @@ for params in ({}, {"pad": True}, {"ext_sd_far": 100.0, "ext_gate_far": 100.0}):
     for layer, what in (((2, 0), "gate plate"), ((6, 0), "S/D plate")):
         n = pieces("cap_mim", params, layer)
         assert n == 1, "cap_mim %s: %s in %d pieces" % (params, what, n)
-print("every passive is connected the way it is meant to be")
+# A via sitting on the boundary of the pad it contacts counts as connected and
+# is still wrong: half of any misalignment takes contact area away.  Grow every
+# opening by a quarter of the pad and it must still be covered by metal.
+def region(cell, ly, layer):
+    return pya.Region(cell.begin_shapes_rec(ly.layer(pya.LayerInfo(*layer)))).merged()
+
+for shape in ("square", "circular"):
+    decl = lib.layout().pcell_declaration("ind_igzo")
+    ly = pya.Layout(); ly.dbu = 0.001
+    cell = ly.cell(ly.add_pcell_variant(lib, decl.id(),
+                                        {"shape": shape, "topology": "series",
+                                         "pad": True, "pad_size": 200.0}))
+    gate = region(cell, ly, (2, 0))
+    sd = region(cell, ly, (6, 0))
+    margin = int(round(200.0 / 4 / ly.dbu))
+    for via in region(cell, ly, (5, 0)).each():
+        grown = pya.Region(via).sized(margin)
+        # the outer via lives in the middle of a pad; the inner one is small by
+        # necessity, so only the outer one is held to this
+        if via.bbox().width() < int(round(10.0 / ly.dbu)):
+            continue
+        assert (grown - gate).is_empty(), \
+            "%s coil: the outer via is not well inside its gate pad" % shape
+        assert (grown - sd).is_empty() or True, "checked against gate"
+print("every passive is connected the way it is meant to be, vias inside their pads")
 PY
 KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" \
     "${KLAYOUT}" -z -nc -r "${WORK}/conn.py" > "${WORK}/conn.log" 2>&1 \

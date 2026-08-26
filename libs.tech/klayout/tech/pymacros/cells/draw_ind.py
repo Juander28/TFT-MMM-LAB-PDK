@@ -176,6 +176,7 @@ def _pin(cell, on_gate, name, x, y, size):
 def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
                 on_gate=True, lead=40.0, via=20.0, via_enc=5.0,
                 pad=False, pad_size=200.0, lbl=True, value_text=None):
+    pad_probe = pad
     """
     One spiral, plus the underpass that brings the inner end out.
 
@@ -202,38 +203,42 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     # it pinches against the first turn where the two run tangentially - a slot
     # that narrows to nothing and cannot be etched.  Dropping to the other
     # metal immediately avoids the geometry rather than arguing with it.
-    # The inner opening is the smallest the rules allow (5 um, with 5 um of
-    # metal round it).  It has to fit between the first turn and the second
-    # one, and a comfortable opening there does not: the pad would push into
-    # the neighbouring turn.  The outer opening has the whole page to itself
-    # and is drawn at the requested size.
-    x_exit = -(x_out + lead)
+    via_w = max(via, w)
+    pad = via_w / 2.0 + via_enc
     via_in = max(5.0, min(via, w / 2.0))
     pad_in = via_in / 2.0 + via_enc
-    via_out = max(via, w)
-    pad_out = via_out / 2.0 + via_enc
     x_in = pts[0][0] + pad_in              # pad centre, shifted inwards
-    _box(cell, under_layer, x_exit - pad_out, -pad_out, x_in + pad_in, pad_out)
-    # `enc`, not `pad`: `pad` is the probe-pad flag from the caller, and
-    # rebinding it here quietly turned the pads on for every coil.
-    for x, via_w, enc in ((x_in, via_in, pad_in), (x_exit, via_out, pad_out)):
+    x_exit = -(x_out + lead)
+
+    # Where the outer terminal ends up.  With a probe pad it is the middle of
+    # that pad, not its edge: a via sitting on the boundary of the metal it
+    # contacts looks marginal and is marginal - half of any misalignment takes
+    # contact area away.  In the middle it is surrounded by pad on every side.
+    if pad_probe:
+        x_out_via = x_exit - pad_size / 2.0 + w
+        via_out = min(max(via, w), pad_size / 2.0)
+    else:
+        x_out_via = x_exit
+        via_out = max(via, w)
+    pad_out = via_out / 2.0 + via_enc
+
+    # The underpass runs from the inner end all the way to that via.
+    _box(cell, under_layer, min(x_out_via - pad_out, x_exit - pad_out), -pad_out,
+         x_in + pad_in, pad_out)
+    for x, vw, enc in ((x_in, via_in, pad_in), (x_out_via, via_out, pad_out)):
         _box(cell, coil_layer, x - enc, -enc, x + enc, enc)
-        _box(cell, OXETCH, x - via_w / 2.0, -via_w / 2.0,
-             x + via_w / 2.0, via_w / 2.0)
+        _box(cell, OXETCH, x - vw / 2.0, -vw / 2.0, x + vw / 2.0, vw / 2.0)
 
     # --- probe pads ---------------------------------------------------------
-    # One on the outer lead, one on the inner terminal's exit.  Both on the
-    # coil's own metal: at the exit the gate already reaches down to the
-    # underpass through the via, so the pad lands on the metal that is on top.
-    # The pads overlap the track they sit on by a full track width instead of
-    # butting against it.  A butt joint is electrically fine on a drawing and
-    # a knife edge in silicon: it is the whole connection resting on the mask
-    # landing exactly where it was drawn.  One track width of overlap costs
-    # nothing and removes the dependency.
-    if pad:
+    # Each pad swallows the track that feeds it: the outer lead runs on to the
+    # middle of its pad instead of stopping at the edge.  A 10 um trace butting
+    # against a 200 um pad is a connection you have to squint at; a trace that
+    # crosses it is one you cannot mistake.
+    if pad_probe:
         half_p = pad_size / 2.0
         x_a = x_out + lead - w
         _box(cell, coil_layer, x_a, -half_p, x_a + pad_size, half_p)
+        _path(cell, coil_layer, [(x_out, 0.0), (x_a + half_p, 0.0)], w)
         x_b = x_exit + w
         _box(cell, coil_layer, x_b - pad_size, -half_p, x_b, half_p)
 
@@ -241,8 +246,8 @@ def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     # neither LVS nor a resistance extraction has anything to report.
     if lbl:
         size = grid(min(w, 2.0 * pad_out))
-        x_a = x_out + lead + (pad_size / 2.0 - w if pad else -w)
-        x_b = x_exit - (pad_size / 2.0 - w if pad else 0.0)
+        x_a = x_out + lead + (pad_size / 2.0 - w if pad_probe else -w)
+        x_b = x_exit - (pad_size / 2.0 - w if pad_probe else 0.0)
         _pin(cell, on_gate, "A", x_a, 0.0, size)
         _pin(cell, on_gate, "B", x_b, 0.0, size)
 
@@ -326,13 +331,22 @@ def draw_rings(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
     # that two pads of any size do not run into each other.
     if pad:
         half_p = pad_size / 2.0
+        x_pad_l = x_end - w
+        x_pad_c = x_pad_l + half_p
         for sign in (1.0, -1.0):
             y_c = sign * (slot + half_p - w / 2.0)
-            # a track width of overlap onto the bus, for the same reason
-            _box(cell, coil_layer, x_end - w, y_c - half_p,
-                 x_end - w + pad_size, y_c + half_p)
-            _box(cell, coil_layer, x_end - w, min(y_c, sign * slot) - w / 2.0,
-                 x_end, max(y_c, sign * slot) + w / 2.0)
+            _box(cell, coil_layer, x_pad_l, y_c - half_p,
+                 x_pad_l + pad_size, y_c + half_p)
+            # The bus runs on to the middle of its pad and the jog to the pad
+            # centre stands there, inside the metal.  A bus that stops at the
+            # pad's edge and turns is a connection made at a boundary: it is
+            # the one place where a misalignment takes contact away instead of
+            # just moving it.
+            _path(cell, coil_layer, [(x_start, sign * slot),
+                                     (x_pad_c, sign * slot)], w)
+            _box(cell, coil_layer, x_pad_c - w / 2.0,
+                 min(y_c, sign * slot) - w / 2.0, x_pad_c + w / 2.0,
+                 max(y_c, sign * slot) + w / 2.0)
 
     if lbl:
         size = grid(min(w, 20.0))

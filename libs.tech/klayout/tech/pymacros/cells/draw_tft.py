@@ -269,10 +269,14 @@ def draw_cap_mim(cell, w=400.0, l=400.0, ext_sd=200.0, ext_gate=200.0,
     if pad:
         half_p = pad_size / 2.0
         # S/D pad hangs below the lower plate, with its own window.
-        _box(cell, SD, -half_p, sd_bot - pad_size, half_p, sd_bot)
-        sd_bot -= pad_size
-        _box(cell, OXETCH, -half_p + etch_inset, sd_bot - pad_size + etch_inset,
-             half_p - etch_inset, sd_bot - etch_inset)
+        pad_top, pad_bot = sd_bot, sd_bot - pad_size
+        _box(cell, SD, -half_p, pad_bot, half_p, pad_top)
+        # The window belongs inside the pad that was just drawn - taking
+        # pad_size off sd_bot first and then again here put it a whole pad
+        # below the metal, opening the dielectric onto nothing.
+        _box(cell, OXETCH, -half_p + etch_inset, pad_bot + etch_inset,
+             half_p - etch_inset, pad_top - etch_inset)
+        sd_bot = pad_bot
         # Gate pad sits beyond the upper plate; it is above the dielectric.
         _box(cell, GATE, g_right, -half_p, g_right + pad_size, half_p)
         g_right += pad_size
