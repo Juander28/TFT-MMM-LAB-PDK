@@ -1,0 +1,144 @@
+% Magnetic fields and thin-film transistors.
+%
+% Background for the B and b_scale parameters of igzo_tft.  README.md in this
+% directory says what each entry would predict for our own device, and groups
+% them so that a field applied during fabrication is not mistaken for a field
+% applied during operation.  Metadata checked against Crossref.
+
+% --- field applied during fabrication ---------------------------------------
+
+@article{park2018_magnetic_activation,
+  author  = {Park, Jeong Woo and Tak, Young Jun and Na, Jae Won and Lee,
+             Heesoo and Kim, Won-Gi and Kim, Hyun Jae},
+  title   = {Effect of Static and Rotating Magnetic Fields on
+             Low-Temperature Fabrication of {InGaZnO} Thin-Film Transistors},
+  journal = {ACS Applied Materials \& Interfaces},
+  volume  = {10},
+  number  = {19},
+  pages   = {16613--16622},
+  year    = {2018},
+  doi     = {10.1021/acsami.8b02433},
+  note    = {Field during processing, not during operation.  A rotating field
+             at 1150 rpm gives mu_FE = 12.68 cm^2/Vs at low process
+             temperature.  A fabrication option for us, not a model term.}
+}
+
+% --- field applied during operation: quantum interference in a-IGZO ---------
+
+@article{wang2017_wl_wal,
+  author  = {Wang, Wei-Hsiang and Lyu, Syue-Ru and Heredia, Elica and
+             Liu, Shu-Hao and Jiang, Pei-hsun and Liao, Po-Yung and
+             Chang, Ting-Chang and Chen, Hua-Mao},
+  title   = {Competing weak localization and weak antilocalization in
+             amorphous indium--gallium--zinc-oxide thin-film transistors},
+  journal = {Applied Physics Letters},
+  volume  = {110},
+  number  = {2},
+  pages   = {022106},
+  year    = {2017},
+  doi     = {10.1063/1.4974080},
+  eprint  = {1703.04007},
+  archivePrefix = {arXiv},
+  note    = {The reference device: mu = 5.6 cm^2/Vs, V_T = 1.4 V, S.S. = 0.45
+             V/dec.  Magnetoconductivity from 1.5 K to 40 K, B up to 0.2 T;
+             1.3e-6 e^2/h over the sweep at 40 K, and washing out with rising
+             temperature.  A percent-level effect exists in this material at
+             this mobility - at liquid-helium temperature.}
+}
+
+@article{wang2017_universal,
+  author  = {Wang, Wei-Hsiang and Lyu, Syue-Ru and Heredia, Elica and
+             Liu, Shu-Hao and Jiang, Pei-hsun and Liao, Po-Yung and
+             Chang, Ting-Chang},
+  title   = {Universal dependence on the channel conductivity of the competing
+             weak localization and antilocalization in amorphous
+             {InGaZnO$_4$} thin-film transistors},
+  journal = {Applied Physics Express},
+  volume  = {10},
+  number  = {5},
+  pages   = {051103},
+  year    = {2017},
+  doi     = {10.7567/APEX.10.051103},
+  eprint  = {1705.05010},
+  archivePrefix = {arXiv},
+  note    = {The same competition across several devices, collapsing onto a
+             universal function of channel conductivity - a property of the
+             conduction state, not of one sample.}
+}
+
+@misc{wang2017_double_gate,
+  author  = {Wang, Wei-Hsiang and others},
+  title   = {Weak Localization and Weak Antilocalization in Double-Gate
+             a-{InGaZnO} Thin-Film Transistors},
+  year    = {2017},
+  eprint  = {1712.07618},
+  archivePrefix = {arXiv},
+  note    = {Carrier density set independently of the field.  Same temperature
+             range, same conclusion.}
+}
+
+% --- field applied during operation: split-drain magnetic sensors -----------
+
+@article{rodriguez2004_magfet_analysis,
+  author  = {Rodriguez-Torres, R. and Gutierrez-Dominguez, E. A. and
+             Klima, R. and Selberherr, S.},
+  title   = {Analysis of Split-Drain {MAGFETs}},
+  journal = {IEEE Transactions on Electron Devices},
+  volume  = {51},
+  number  = {12},
+  pages   = {2237--2245},
+  year    = {2004},
+  doi     = {10.1109/ted.2004.839869},
+  note    = {The standard analysis.  The response comes from the roll-off of
+             the induced Hall potential along the channel; dI_D/I_D is linear
+             in B and largely independent of geometry.}
+}
+
+@article{garcia2004_magfet_lowtemp,
+  author  = {Garc{\'i}a-Ram{\'i}rez, P. J. and Sandoval-Ibarra, F.},
+  title   = {Performance of a {MFS}-based {MOSFET} for low temperature
+             applications},
+  journal = {Journal of Applied Research and Technology},
+  volume  = {2},
+  number  = {1},
+  pages   = {37--43},
+  year    = {2004},
+  note    = {Open access.  Sensitivity plotted against carrier mobility and
+             temperature over mu = 1e2 to 1e5 cm^2/Vs; below 1 mT detectable
+             at 77 K.  Extrapolated to mu = 4.6 cm^2/Vs it gives about
+             0.05 %/T, which is mu*B - measurement agreeing with theory.}
+}
+
+@article{zhao2014_polysi_magfet,
+  author  = {Zhao, Xiaofeng and Wen, Dianzhong and L{\"u}, Meiwei and
+             Guan, Hanyu and Liu, Gang},
+  title   = {Fabrication and characterization of the split-drain {MAGFET}
+             based on the nano-polysilicon thin film transistor},
+  journal = {Journal of Semiconductors},
+  volume  = {35},
+  number  = {9},
+  pages   = {094004},
+  year    = {2014},
+  doi     = {10.1088/1674-4926/35/9/094004},
+  note    = {A split-drain MAGFET on a thin-film transistor rather than in
+             crystalline silicon - the nearest published thing to using our
+             own devices as magnetic sensors.  Needs a fourth terminal.}
+}
+
+% --- field applied during operation: Hall effect in amorphous oxides --------
+
+@article{joo2020_hall_offset,
+  author  = {Joo, Hyo-Jun and Kim, Dae-Hwan and Cha, Hyun-Seok and
+             Song, Sang-Hun},
+  title   = {Conduction Band Edge Energy Profile Probed by {Hall} Offset
+             Voltage in {InGaZnO} Thin Films},
+  journal = {Micromachines},
+  volume  = {11},
+  number  = {9},
+  pages   = {822},
+  year    = {2020},
+  doi     = {10.3390/mi11090822},
+  note    = {Open access.  Hall voltage linear in B from -0.4 T to +0.4 T, as
+             classical theory says, with a non-zero offset at B = 0.  The
+             offset is the practical obstacle: drifting, it looks like signal.}
+}
