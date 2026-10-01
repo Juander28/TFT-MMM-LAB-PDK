@@ -1,0 +1,74 @@
+v {xschem version=3.4.5 file_version=1.2
+
+* IGZO TFT with the ESTIMATED gate capacitance - UCI/INRF (igzo_mmm_lab)
+*
+* Same device as tft_igzo.sym, wired to `igzo_tft_cv` instead of `igzo_tft`,
+* so that the gate sees the oxide in SERIES with the semiconductor rather
+* than the oxide alone.
+*
+* NOTHING ABOUT THAT CAPACITANCE IS MEASURED ON THIS PROCESS.  It is built
+* from published a-IGZO values in libs.tech/ngspice/igzo_cv_estimated.ngspice,
+* which has to be .included alongside design.ngspice for this symbol to
+* netlist into anything that simulates.  Read that file before quoting a
+* number that came through this symbol.
+*
+* Two parameters this symbol has and tft_igzo.sym does not:
+*
+*   vdep     1 (default) = the capacitance FOLLOWS the gate voltage, moving
+*                between the depleted and accumulated limits through a tanh
+*                whose width is itself an estimate.  This is what a C-V sweep
+*                should be simulated with.
+*            0 = the capacitance is pinned by `acc` instead, which is how the
+*                two limits are bracketed and asserted.
+*
+*   acc      only read when vdep = 0.  0 = channel depleted (the pessimistic
+*            AC case), 1 = channel accumulated, capacitance at the oxide
+*            value.
+*
+*   t_igzo   semiconductor thickness in metres.  Defaults to 30e-9, which is
+*            the film thickness this PDK states in libs.tech/magic.  Sweep it
+*            to see how much the answer depends on a number nobody measured.
+*
+* Pins are D, G, S in that order, matching
+*     .subckt igzo_tft_cv d g s
+* exactly as tft_igzo.sym does.
+}
+G {}
+K {type=nmos
+format="@spiceprefix@name @pinlist @model W=@W L=@L ov=@ov nf=@nf m=@m B=@B b_scale=@b_scale acc=@acc t_igzo=@t_igzo vdep=@vdep"
+lvs_format="@spiceprefix@name @pinlist @model W=@W L=@L nf=@nf m=@m"
+template="name=M1
+W=100u
+L=10u
+ov=5u
+nf=1
+m=1
+B=0
+b_scale=1
+acc=0
+t_igzo=30e-9
+vdep=1
+model=igzo_tft_cv
+spiceprefix=X
+"
+}
+V {}
+S {}
+E {}
+L 4 7.5 -22.5 7.5 22.5 {}
+L 4 20 -30 20 -17.5 {}
+L 4 20 17.5 20 30 {}
+L 4 7.5 -17.5 20 -17.5 {}
+L 4 7.5 17.5 20 17.5 {}
+L 4 -20 0 -7.5 -0 {}
+L 4 -7.5 -15 -7.5 15 {}
+B 4 -5 -15 -2.5 15 {}
+B 5 17.5 -32.5 22.5 -27.5 {name=D dir=inout}
+B 5 -22.5 -2.5 -17.5 2.5 {name=G dir=in}
+B 5 17.5 27.5 22.5 32.5 {name=S dir=inout}
+T {S} 22.5 17.5 0 0 0.15 0.15 {layer=7}
+T {D} 22.5 -17.5 2 1 0.15 0.15 {layer=7}
+T {G} -10 -10 0 1 0.15 0.15 {layer=7}
+T {@name} 30 -20 0 0 0.2 0.2 {}
+T {@model} 30 -8.75 0 0 0.2 0.2 {}
+T {W=@W L=@L} 30 2.5 0 0 0.2 0.2 {}

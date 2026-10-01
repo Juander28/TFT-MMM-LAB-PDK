@@ -124,3 +124,20 @@ C1 p m 'cox_area*W*L'
 L1 a mid 'ls'
 R1 mid b 'rs'
 .ends ind_igzo
+
+*************************************************************************
+** smd_cap - a surface-mount capacitor soldered or glued onto two pads
+**   XC1 p m smd_cap c=10u esr=10m
+**
+** A bought part, not a process device: the layout draws only its pads (the
+** smd_cap PCell), plus markers that make extraction report c.  esr is the
+** part's equivalent series resistance from its datasheet; LVS ignores it.
+** Not modelled: the loss of capacitance with DC bias, which for a Class II
+** ceramic (X5R, X7R) is large - a 10 uF 0603 rated 10 V can keep well under
+** half its value at 5 V.  Take c from the maker's DC-bias curve at the
+** working voltage, not from the label.
+*************************************************************************
+.subckt smd_cap p m c=1u esr=10m
+R1 p mid 'max(esr,1u)'
+C1 mid m 'c'
+.ends smd_cap

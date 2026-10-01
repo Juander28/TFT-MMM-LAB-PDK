@@ -1,0 +1,181 @@
+* ============================================================================
+* ESTIMATED gate capacitance for igzo_mmm_lab - NOT MEASURED
+* ============================================================================
+*
+* WHAT THIS IS FOR.  The measured PDK knows one capacitance: Cox, from the
+* 400 x 400 um plate.  It knows nothing about the SEMICONDUCTOR's own
+* capacitance, because no C-V sweep has been taken on a transistor.  Every AC
+* number this laboratory has produced therefore rests on the oxide alone.
+*
+* This file supplies an estimate, so that a circuit can be simulated with a
+* plausible gate capacitance before the measurement exists, and so that the
+* measurement - when it is taken - has something to be compared against.
+*
+* NOTHING IN THIS FILE IS MEASURED ON THIS PROCESS.  Every number is either
+* geometry this PDK already knows, or a value from the literature on
+* amorphous IGZO.  Do not quote a result that depends on it without saying
+* which of the two it came from.
+*
+* HOW TO USE IT
+*
+*     .include $PDK_ROOT/$PDK/libs.tech/ngspice/design.ngspice
+*     .include $PDK_ROOT/$PDK/libs.tech/ngspice/igzo_cv_estimated.ngspice
+*     .lib     $PDK_ROOT/$PDK/libs.tech/ngspice/igzo_mmm_lab.ngspice best
+*     XM1 d g s igzo_tft_cv W=1000u L=8u ov=5u
+*
+* `igzo_tft_cv` is `igzo_tft` with the estimated capacitance added.  The
+* plain `igzo_tft` is untouched, so nothing that exists today changes
+* behaviour by including this file.
+*
+* WHEN THE MEASUREMENT ARRIVES: replace the three .param values below with
+* the extracted ones and delete the ESTIMATED warnings.  Nothing else has to
+* change - not the wrapper, not the testbench, not a netlist.
+*
+* ----------------------------------------------------------------------------
+* THE PHYSICS, AND WHERE EACH NUMBER COMES FROM
+*
+* A top-gate TFT's gate sees the oxide in series with whatever the
+* semiconductor presents:
+*
+*     1/C_gate = 1/C_ox + 1/C_semiconductor
+*
+* In strong accumulation the accumulation layer sits within a nanometre or
+* two of the interface, C_semiconductor is very large, and C_gate -> C_ox.
+* With the channel depleted, the whole 30 nm film is the dielectric and
+* C_semiconductor is at its minimum.  The estimate covers both ends.
+*
+*   eps_igzo = 16          relative permittivity of amorphous IGZO.
+*                          [1] Chasin et al., "Flexible indium-gallium-zinc-
+*                          oxide Schottky diode operating beyond 2.45 GHz",
+*                          Nature Communications 6, 7561 (2015), which
+*                          extracts eps_r = 16 from its C-V.  Values from 10
+*                          to 16 appear across the literature; 16 is the
+*                          pessimistic end for AC loading, which is the end
+*                          worth designing against.
+*
+*   t_igzo = 30 nm         NOT from the literature - this is the film
+*                          thickness this PDK already states, in
+*                          libs.tech/magic/igzo_mmm_lab.tech ("Film
+*                          thicknesses: 30 nm IGZO").
+*
+*   n_igzo = 1e16 cm^-3    free carrier concentration of the undoped film.
+*                          [2] Facing-target-sputtered a-IGZO measured at
+*                          3.6e15 to 7.4e15 cm^-3 by Hall; plasma-treated
+*                          films reach 1e19 and above.  1e16 is a round
+*                          number inside the undoped range.  It is used ONLY
+*                          to check that the film fully depletes - see below -
+*                          and no simulated current depends on it.
+*
+* THE CHECK THAT MAKES THIS USABLE.  The Debye length in the film is
+*
+*     L_D = sqrt(eps_igzo * kT / (q^2 * n))  =  48 nm at n = 1e16 cm^-3
+*
+* which is longer than the 30 nm film.  The channel film therefore depletes
+* all the way through, so C_semiconductor bottoms out at eps_igzo/t_igzo
+* rather than at some bias-dependent depletion width.  That is what makes a
+* two-capacitor series a defensible estimate instead of a hand-wave, and it
+* is why n appears in this file at all.
+*
+*   C_ox     = 1.564 fF/um^2   MEASURED, from design.ngspice
+*   C_igzo   = 4.72 fF/um^2    estimated: eps0*16/30nm
+*   C_series = 1.174 fF/um^2   the two in series - 75 % of the oxide alone
+*
+* So the estimate says: a fully depleted channel presents about three
+* quarters of the capacitance the oxide alone would suggest, and an
+* accumulated one presents very nearly all of it.  If a C-V measurement comes
+* back flat at Cox, the semiconductor is more conductive than assumed; if it
+* comes back near 1.17 fF/um^2 and stays there, it is not accumulating.
+* Either outcome is informative, which is the point of writing the estimate
+* down before measuring.
+* ============================================================================
+
+.param
++  eps0        = 8.8541878e-12   $ F/m     vacuum permittivity
++  eps_igzo    = 16              $ -       ESTIMATED, literature [1]
++  t_igzo      = 30e-9           $ m       this PDK's own stated thickness
++  n_igzo      = 1e22            $ m^-3    ESTIMATED, literature [2]
+*  Reference values at the default thickness, for reading and for hand
+*  checks.  The wrapper recomputes them from its own t_igzo so that the
+*  instance parameter actually does something.
++  c_igzo_area = 'eps0*eps_igzo/t_igzo'
++  c_series_area = '1/(1/cox_area + 1/c_igzo_area)'
+*  Where the capacitance turns over, and how sharply.  vth_cv is the
+*  best-corner threshold; vt_cv is a SHAPE PARAMETER with no measurement
+*  behind it - it is how wide the transition is in volts, and a C-V sweep is
+*  exactly the measurement that would replace it.
++  vth_cv      = 0.09            $ V       best-corner Vto
++  vt_cv       = 0.6             $ V       ESTIMATED transition width
+
+* ---------------------------------------------------------------------------
+* igzo_tft_cv - the device, with the estimated gate capacitance
+*
+* Identical to igzo_tft except that the gate capacitances see the oxide and
+* the semiconductor in series rather than the oxide alone, and a channel
+* capacitance is added that the level-1 core does not provide.
+*
+* `acc` selects the regime, because level 1 cannot switch between them by
+* itself:
+*     acc = 0   channel depleted - the pessimistic AC case, and the default
+*     acc = 1   channel accumulated - capacitance tends to the oxide value
+* A real device moves between the two with VGS.  Sweeping `acc` is how this
+* estimate brackets that, and it is deliberately a knob rather than a hidden
+* formula: a smooth transition here would look like knowledge nobody has.
+* ---------------------------------------------------------------------------
+.subckt igzo_tft_cv d g s W=100u L=10u ov=5u nf=1 B=0 b_scale=1 acc=0
++  t_igzo=30e-9 vdep=1
+* The series is formed HERE, from the instance's own t_igzo, not from the
+* global .param above: a global would make every instance share one thickness
+* and the parameter would be silently ignored - which is exactly what
+* happened on the first attempt.
+.param c_igzo_inst = 'eps0*eps_igzo/t_igzo'
+.param c_series_inst = '1/(1/cox_area + 1/c_igzo_inst)'
+.param mr_cv = '1 + (mu_corner * b_scale * B) * (mu_corner * b_scale * B)'
+Rd  d  di 'rc_w/W'
+Rs  s  si 'rc_w/W'
+M1  di g  si si IGZO_TFT W='W/mr_cv' L='L'
+*
+* THE GATE CAPACITANCE, AND HOW IT MOVES WITH BIAS
+*
+* Between the two limits - oxide alone when the channel is accumulated,
+* oxide in series with the film when it is depleted - a real device moves
+* smoothly, and where it sits is set by the gate voltage.  The weight `fa`
+* below carries that:
+*
+*     fa = 0.5 * (1 + tanh((Vgs - vth_cv) / vt_cv))
+*
+* which is 0 well below threshold, 1 well above, and passes through 0.5 at
+* vth_cv.  It is a SHAPE, not a derivation: nothing in the measurements says
+* how sharp the transition is, and vt_cv is the knob that admits it.  A
+* surface-potential model would produce this curve from physics; level 1
+* cannot, and pretending otherwise would be worse than saying so.
+*
+*   vdep = 1  (default)  capacitance follows Vgs through fa
+*   vdep = 0             capacitance is pinned by `acc`, 0 = depleted,
+*                        1 = accumulated.  This is what the bracketing
+*                        testbench uses, and what the check asserts against.
+Cgd g  di C='ov*W*(cox_area*(vdep*(0.5*(1+tanh((v(g,si)-vth_cv)/vt_cv)))
++     + (1-vdep)*acc) + c_series_inst*(1-(vdep*(0.5*(1+tanh((v(g,si)-vth_cv)
++     /vt_cv))) + (1-vdep)*acc)))'
+Cgs g  si C='ov*W*(cox_area*(vdep*(0.5*(1+tanh((v(g,si)-vth_cv)/vt_cv)))
++     + (1-vdep)*acc) + c_series_inst*(1-(vdep*(0.5*(1+tanh((v(g,si)-vth_cv)
++     /vt_cv))) + (1-vdep)*acc)))'
+.ends igzo_tft_cv
+*
+* WHAT THIS WRAPPER DOES NOT FIX.  Level 1 derives its own gated-channel
+* charge from Tox = 22.1 nm, an SiO2-EQUIVALENT thickness chosen to reproduce
+* Cox, and it knows nothing about the semiconductor.  That part of the
+* capacitance therefore still behaves as if the oxide were the whole stack.
+*
+* It cannot be corrected from outside: the semiconductor sits in SERIES with
+* the oxide, and a series element cannot be added by hanging another capacitor
+* in parallel - the attempt produces a negative capacitance, which is how this
+* limitation was found rather than assumed.  Correcting it needs a model with
+* a real surface potential, not level 1.
+*
+* So the estimate corrects the OVERLAP, which the wrapper owns explicitly, and
+* leaves the channel term alone.  On the validated device (W = 1000 um,
+* L = 8 um, ov = 5 um) the overlap is 7.8 pF per side against 12.5 pF of
+* channel.  Simulated end to end, the total gate capacitance goes from
+* 28.14 pF with the oxide alone to 24.25 pF with the semiconductor in
+* series - a drop of 13.8 %.  Real, but not the whole answer: the channel
+* term inside level 1 is untouched, so the true figure is larger than this.
