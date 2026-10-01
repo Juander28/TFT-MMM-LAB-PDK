@@ -83,6 +83,30 @@ ln -s /path/to/TFT-MMM-LAB-PDK /foss/pdks/TFT-MMM-LAB-PDK
 puts it literally beside the others; `install.sh` does that by itself whenever
 `/foss/pdks` happens to be writable.
 
+### Outside the container
+
+The same command. `install.sh` does not require `/foss/pdks` to exist - without
+it you simply get a `PDK_ROOT` holding this PDK alone. What it does need is the
+four tools on the machine: `klayout`, `ngspice`, `magic` and `xschem`.
+
+One thing is handled for you that catches people out. klayout, ngspice and
+magic are all reached through environment variables, so `use-pdk` is enough.
+xschem is not - it reads a Tcl rc file, and a stock `~/.xschem/xschemrc` knows
+about no PDK at all. Opened that way, every symbol on a test sheet reads
+`IS MISSING`, including xschem's own `devices/` library. `install.sh` adds a
+marked block to that file which sources this PDK's `xschemrc` whenever
+`use-pdk` has selected it, and leaves xschem working as before when it has not.
+
+It also exports `DESIGNS`, pointing at the directory this PDK was cloned into,
+so a design can instance one of its own cells by a path relative to the tree -
+`MMM-LAB DESIGN/OPAM/OPAM2.sym` - from wherever xschem was started, and so
+netlists land somewhere that exists. Inside the container `.designinit` already
+sets it and the existing value is kept.
+
+`run_checks.sh` passes all 23 checks on a bare machine with nothing but
+`use-pdk TFT-MMM-LAB-PDK` in the environment, which is the real test that this
+works.
+
 Verify the whole thing across the four tools at any time:
 
 ```bash

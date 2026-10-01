@@ -23,6 +23,7 @@ set -e
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAME="$(basename "${SRC}")"
 PDK_ROOT_NEW="${HOME}/pdks"
+DESIGNS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR_ROOT="/foss/pdks"
 DO_BASHRC=1
 MARKER="# >>> ${NAME} <<<"
@@ -61,11 +62,55 @@ else
     echo "      ln -s ${SRC} ${VENDOR_ROOT}/${NAME}"
 fi
 
-# --- 3. the environment ------------------------------------------------------
+# --- 3. xschem ---------------------------------------------------------------
+# klayout, ngspice and magic are all reached through environment variables, so
+# use-pdk is enough for them.  xschem is not: it reads a Tcl rc file, and the
+# stock ~/.xschem/xschemrc knows nothing about any PDK.  Inside the container
+# the mount's own rc file sources ours; on a bare machine nothing does, and
+# xschem comes up unable to find even its own devices/ library - every symbol
+# on a test sheet reads "IS MISSING".
+#
+# So the same marked-block trick as for .bashrc, in the xschem rc file.
+XSCHEMRC="${HOME}/.xschem/xschemrc"
+mkdir -p "$(dirname "${XSCHEMRC}")"
+touch "${XSCHEMRC}"
+if grep -qF "${MARKER}" "${XSCHEMRC}"; then
+    sed -i "\|^${MARKER}$|,\|^${MARKER}$|d" "${XSCHEMRC}"
+    echo "  replaced the previous block in ${XSCHEMRC}"
+else
+    echo "  added the PDK to ${XSCHEMRC}"
+fi
+cat >> "${XSCHEMRC}" <<XEOF
+
+${MARKER}
+# Load whichever PDK use-pdk selected.  Guarded, because xschem is also used
+# without a PDK and this file must not break that.
+if { [info exists env(PDK_ROOT)] && [info exists env(PDK)] } {
+  set _rc \$env(PDK_ROOT)/\$env(PDK)/libs.tech/xschem/xschemrc
+  if { [file exists \$_rc] } { source \$_rc }
+}
+# The design tree, so a cell can be instanced by a path relative to it -
+# "MMM-LAB DESIGN/OPAM/OPAM2.sym" - from wherever xschem was started.
+if { [info exists env(DESIGNS)] && \$env(DESIGNS) ne {} } {
+  append XSCHEM_LIBRARY_PATH :\$env(DESIGNS)
+  # Netlists and raw files.  Created if missing: pointing netlist_dir at a
+  # directory that is not there makes xschem fail to write WITHOUT SAYING SO.
+  set netlist_dir \$env(DESIGNS)/simulations
+  file mkdir \$netlist_dir
+}
+${MARKER}
+XEOF
+
+# --- 4. the environment ------------------------------------------------------
 ENVBLOCK=$(cat <<ENVEOF
 ${MARKER}
 # Writable PDK_ROOT holding the vendor PDKs and ${NAME}.
 export PDK_ROOT=${PDK_ROOT_NEW}
+# The design tree.  Inside the container .designinit sets this; on a bare
+# machine nothing does, so fall back to whatever directory this PDK was
+# cloned into.  xschem uses it to find cells by a path relative to the tree,
+# and to put netlists somewhere that exists.
+export DESIGNS="\${DESIGNS:-${DESIGNS_DIR}}"
 # Switch PDK in one command:  use-pdk TFT-MMM-LAB-PDK  |  use-pdk gf180mcuD
 use-pdk() {
     export PDK="\$1"
