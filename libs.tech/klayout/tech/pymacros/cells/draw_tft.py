@@ -195,7 +195,12 @@ def draw_tft(
     # --- pins and labels ----------------------------------------------------
     if lbl:
         s_x = (electrodes[0][0] + electrodes[0][1]) / 2.0
-        d_x = (electrodes[-1][0] + electrodes[-1][1]) / 2.0
+        # Electrodes alternate S, D, S, D ... from the left, so electrodes[1]
+        # is always a drain.  The LAST one is a drain only when nf is odd:
+        # with nf even it is a source, and labelling it D (as this once did)
+        # put the D port on the source net - magic then reports D and S
+        # shorted and LVS fails on pins.
+        d_x = (electrodes[1][0] + electrodes[1][1]) / 2.0
         g_x = 0.0
         size = grid(max(1.0, min(w_gate, sd_len) / 10.0))
         # The text goes on the pin purpose, not the label purpose: that is
