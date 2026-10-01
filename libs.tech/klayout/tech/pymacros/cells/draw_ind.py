@@ -17,8 +17,14 @@ back out - which is what the resistance is computed from, rather than from a
 closed-form guess at the length.
 
 Coordinates are micrometres and the centre of the coil is the origin.  A
-spiral brings its outer end out to the right and its inner end out to the left,
-on the other metal; the rings bring both buses out to the right.
+spiral brings both of its ends out to the right: the outer one on the coil's
+own metal, lifted clear in y, and the inner one straight out along y = 0 on the
+other metal.  The rings bring both buses out to the right as well.
+
+Everything that is not a track is a rectangle.  The mouth that takes the inner
+end into its via used to be a leaning four-point polygon; it is now a single
+pya.Box whose left edge sits exactly on the track's own left edge, so the two
+merge into a clean T with no step and no leftover corner.
 """
 
 import math
@@ -93,9 +99,11 @@ def square_spiral(d_in, w, gap, n):
     """
     Centreline of a square spiral, from the inner end outwards.
 
-    The inner end starts on the -x side and the spiral ends on the +x side, so
-    the two terminals leave the coil from opposite quadrants and the underpass
-    never has to pass beneath its own outer lead.
+    The inner end starts on the -x side and the spiral ends on the +x side.
+    The underpass then runs from the inner end out to the right along y = 0,
+    and the outer lead is lifted clear of it in y (see lead_offset), so the two
+    terminals leave on the same side without the underpass ever passing
+    beneath its own outer lead.
     """
     pitch = w + gap
     a = d_in / 2.0 + w / 2.0          # centreline of the innermost track
@@ -165,12 +173,19 @@ def circular_spiral(d_in, w, gap, n, step_deg=2.0):
     return pts
 
 
-def spiral_with_leads(d_in, w, gap, n, shape="square", lead=40.0):
+def spiral_with_leads(d_in, w, gap, n, shape="square", lead=40.0, y_lead=0.0):
     """
     The full centreline of a spiral: the turns, the run in to the centre, and
     the run out past the edge.  One function, used both to draw the coil and to
     work out its resistance, so the two cannot disagree about how much metal
     there is.
+
+    y_lead lifts the outer lead off the axis before it runs out, so that the
+    inner terminal can leave along y = 0 on the same side without the two
+    touching.  That lift is real metal - a few tens of microns of it - which is
+    why it belongs here, in the one function the resistance is measured from,
+    and not in the drawing code.  The default of zero is the coil as it was:
+    the outer lead straight out along the axis.
     """
     pts = (square_spiral(d_in, w, gap, n) if shape == "square"
            else circular_spiral(d_in, w, gap, n))
@@ -185,56 +200,34 @@ def spiral_with_leads(d_in, w, gap, n, shape="square", lead=40.0):
     # to be short: a straight run at the inner end of a circular coil closes on
     # the turn spiralling past it, about 80 nm of the gap per micron.
     pts = [(pts[0][0], pts[0][1] + 1.0)] + pts
+    if y_lead:
+        # straight up the closing wall - collinear on the square coil, a right
+        # angle on the circular one - and only then out
+        pts = pts + [(pts[-1][0], y_lead)]
     return pts + [(pts[-1][0] + lead, pts[-1][1])]
 
 
-def _funnel(cell, li, x_track, w, x1, y_bot, half1):
+def lead_offset(w, gap, via=20.0, via_enc=5.0, pad=False, pad_size=200.0,
+                inner_term=True):
     """
-    The mouth that takes the coil's inner end into its via pad.
+    How far the outer lead has to be lifted for the two terminals to share a
+    side.
 
-    Three things decide its shape, and all three are DRC:
+    The inner terminal comes out along y = 0 and ends in a pad; the outer lead
+    has to clear that pad by the same gap the turns keep from each other.  With
+    probe pads the thing to clear is a whole 200 um pad, so the two pads end up
+    stacked one above the other.
 
-    * it starts *inside* the track, at the centreline, so there is no seam
-      between the two - a mouth that begins at the end face butts against it;
-    * both edges lean the same way - the upper one inwards, the lower one
-      upwards - by more than the couple of degrees a circular track turns
-      through in one step.  Every corner where the mouth meets the track is
-      then obtuse.  Held horizontal and vertical they come out at 87-88 degrees
-      on a curve, and a corner just under a right angle is a spacing violation
-      under a euclidian metric;
-    * the lower edge never dips below the height it entered at, so the mouth
-      cannot flare back across the corner where the track turns away - the
-      notch that made a symmetric funnel fail on the square coil.
+    Both the drawing and the resistance estimate call this, so the coil that is
+    measured is the coil that is drawn.  With no inner terminal there is
+    nothing to clear and the lead goes straight out, as it always did.
     """
-    lean = w / 2.0
-    pts = [(x_track, -w / 2.0),            # buried in the track
-           (x1, y_bot),                    # ... leaning down on the way out
-           (x1, y_bot + 2.0 * half1),
-           (x_track + lean, w / 2.0)]      # ... and inwards on the way up
-    dbu = cell.layout().dbu
-    cell.shapes(layer(cell.layout(), li)).insert(pya.Polygon(
-        [pya.Point(int(round(px / dbu)), int(round(py / dbu))) for px, py in pts]))
-
-
-def _taper(cell, li, x0, half0, x1, half1, y0=0.0, y1=None):
-    """
-    A trapezoid from a cross-section of half-height half0 at x0 to half1 at x1,
-    centred on y0 at one end and on y1 at the other.
-
-    This is what makes a terminal read as connected: a track that ends beside
-    a square pad overlaps it by whatever the end cap happens to cover, and
-    looks - correctly - like something that does not quite touch.  A funnel
-    leaves the track at the track's own width and arrives at the pad at the
-    pad's, with metal all the way across.
-    """
-    if y1 is None:
-        y1 = y0
-    dbu = cell.layout().dbu
-    pts = [(x0, y0 - half0), (x1, y1 - half1),
-           (x1, y1 + half1), (x0, y0 + half0)]
-    poly = pya.Polygon([pya.Point(int(round(px / dbu)), int(round(py / dbu)))
-                        for px, py in pts])
-    cell.shapes(layer(cell.layout(), li)).insert(poly)
+    if not inner_term:
+        return 0.0
+    if pad:
+        return grid(pad_size + gap)
+    pad_out = max(via, w) / 2.0 + via_enc
+    return grid(pad_out + w / 2.0 + gap)
 
 
 def _pin(cell, on_gate, name, x, y, size):
@@ -250,101 +243,115 @@ def _pin(cell, on_gate, name, x, y, size):
 
 def draw_spiral(cell, d_in=100.0, w=10.0, gap=5.0, n=8, shape="square",
                 on_gate=True, lead=40.0, via=20.0, via_enc=5.0,
-                pad=False, pad_size=200.0, lbl=True, value_text=None):
-    pad_probe = pad
+                pad=False, pad_size=200.0, lbl=True, value_text=None,
+                inner_term=True):
     """
-    One spiral, plus the underpass that brings the inner end out.
+    One spiral, plus - unless inner_term is cleared - the underpass that brings
+    the inner end out on the same side as the outer one.
 
     Returns the centreline points - including the two leads, which are as much
     of the coil's resistance as the turns are - so the caller can measure the
     length it actually drew.
+
+    Everything the underpass is made of is a rectangle.  There are exactly
+    three pieces of metal outside the track itself: the mouth, which doubles as
+    the inner via's pad; the underpass on the other metal; and the outer via's
+    pad.  Each meets the next square on, and the mouth meets the track flush
+    against the track's own left edge, so nothing sticks out anywhere.
     """
+    pad_probe = pad
     coil_layer = GATE if on_gate else SD
     under_layer = SD if on_gate else GATE
 
     # The inner end runs on to the centre of the coil and the outer end runs on
     # past the edge, both as part of the same path: two paths butted end to end
-    # leave a notch at the join, and a notch is a width violation.
-    pts = spiral_with_leads(d_in, w, gap, n, shape, lead)
+    # leave a notch at the join, and a notch is a width violation.  The outer
+    # lead is lifted by y_lead so the inner terminal can leave on the same side
+    # along the axis.
+    y_lead = lead_offset(w, gap, via, via_enc, pad_probe, pad_size, inner_term)
+    pts = spiral_with_leads(d_in, w, gap, n, shape, lead, y_lead)
     x_out = pts[-2][0]
     _path(cell, coil_layer, pts, w)
 
     # The inner terminal drops onto the other metal at the inner end of the
-    # first turn and runs out underneath the coil.  Its pad extends inwards,
-    # into the empty middle, and never towards the second turn.
+    # first turn and runs out underneath the coil, to the right.
     #
     # Note what is NOT done here: a lead on the coil's own metal running from
     # the inner end to the centre.  It would be the obvious thing to draw, and
     # it pinches against the first turn where the two run tangentially - a slot
     # that narrows to nothing and cannot be etched.  Dropping to the other
     # metal immediately avoids the geometry rather than arguing with it.
-    via_w = max(via, w)
-    pad = via_w / 2.0 + via_enc
     via_in = max(5.0, min(via, w / 2.0))
     pad_in = via_in / 2.0 + via_enc
-    # The inner pad is shifted inwards and reached through a funnel, so the
-    # track flows into it instead of ending beside it.
-    #
-    # The funnel only opens upwards.  The track arrives at the centre running
-    # down the left side, so the metal below the funnel's mouth is the track
-    # itself: a funnel that widened both ways would flare straight past the
-    # corner where the track turns down and leave a slot a couple of microns
-    # wide between the two - a spacing violation, and the very thing this is
-    # meant to cure.  With the lower edge held flush against the end of the
-    # track that corner stays square, and the pad sits a little high instead.
+    via_out = min(max(via, w), pad_size / 2.0) if pad_probe else max(via, w)
+    pad_out = via_out / 2.0 + via_enc
+
     x_track = pts[0][0]                    # the coil's inner end
-    x_taper = x_track + w / 2.0            # the track's inner edge
-    x_in = x_taper + pad_in * 2.0          # pad centre, clear of the track
-    # grid() keeps lengths positive, so the offsets are snapped and then signed
-    rise = w / 4.0                         # the lower edge climbs on its way out
-    y_bot = -grid(w / 2.0 - rise)          # the mouth's lower edge where it ends
-    y_in = y_bot + grid(pad_in)            # ... so the pad clears the track
-    x_exit = -(x_out + lead)
+    x_in = x_track + w / 2.0 + 2.0 * pad_in   # inner via centre, clear of it
+    x_exit = x_out + lead
 
     # Where the outer terminal ends up.  With a probe pad it is the middle of
     # that pad, not its edge: a via sitting on the boundary of the metal it
     # contacts looks marginal and is marginal - half of any misalignment takes
     # contact area away.  In the middle it is surrounded by pad on every side.
-    if pad_probe:
-        x_out_via = x_exit - pad_size / 2.0 + w
-        via_out = min(max(via, w), pad_size / 2.0)
-    else:
-        x_out_via = x_exit
-        via_out = max(via, w)
-    pad_out = via_out / 2.0 + via_enc
+    x_out_via = x_exit + pad_size / 2.0 - w if pad_probe else x_exit
 
-    # The underpass runs from the inner end all the way to that via.
-    _box(cell, under_layer, min(x_out_via - pad_out, x_exit - pad_out), -pad_out,
-         x_in + pad_in, pad_out)
-    _box(cell, under_layer, x_in - pad_in, min(-pad_out, y_in - pad_in),
-         x_in + pad_in, max(pad_out, y_in + pad_in))
-    _funnel(cell, coil_layer, x_track, w, x_in - pad_in, y_bot, pad_in)
-    for x, y, vw, enc in ((x_in, y_in, via_in, pad_in),
-                          (x_out_via, 0.0, via_out, pad_out)):
-        _box(cell, coil_layer, x - enc, y - enc, x + enc, y + enc)
-        _box(cell, OXETCH, x - vw / 2.0, y - vw / 2.0, x + vw / 2.0, y + vw / 2.0)
+    if inner_term:
+        # The mouth: one rectangle exactly as wide as the track, whose left
+        # edge is the track's own left edge.  On the square coil the union of
+        # the two is a T with four right angles and nothing over - the 1 um
+        # stub the track starts with is well inside it.  It is held to the
+        # track's width and no more, so it cannot bulge into the gap the turns
+        # keep from each other.
+        #
+        # The via's pad is the second rectangle, and it is wider, because
+        # VIA.2 wants 5 um of gate all round a 5 um opening and the track is
+        # only 10 um across.  It sits far enough in that the extra 2.5 um a
+        # side has the empty middle of the coil to bulge into.  When the track
+        # is wide enough to enclose the via on its own the two boxes come out
+        # the same height and merge into one clean rectangle.
+        half_mouth = w / 2.0
+        half_pad = max(pad_in, half_mouth)
+        _box(cell, coil_layer, x_track - w / 2.0, -half_mouth, x_in,
+             half_mouth)
+        _box(cell, coil_layer, x_in - half_pad, -half_pad, x_in + half_pad,
+             half_pad)
+        _box(cell, OXETCH, x_in - via_in / 2.0, -via_in / 2.0,
+             x_in + via_in / 2.0, via_in / 2.0)
+        # The underpass: one rectangle, from that via out past the coil's edge.
+        _box(cell, under_layer, x_in - pad_in, -pad_out,
+             max(x_out_via, x_exit) + pad_out, pad_out)
+        # ... and back up to the coil's own metal at the far end.
+        _box(cell, coil_layer, x_out_via - pad_out, -pad_out,
+             x_out_via + pad_out, pad_out)
+        _box(cell, OXETCH, x_out_via - via_out / 2.0, -via_out / 2.0,
+             x_out_via + via_out / 2.0, via_out / 2.0)
 
     # --- probe pads ---------------------------------------------------------
     # Each pad swallows the track that feeds it: the outer lead runs on to the
     # middle of its pad instead of stopping at the edge.  A 10 um trace butting
     # against a 200 um pad is a connection you have to squint at; a trace that
-    # crosses it is one you cannot mistake.
+    # crosses it is one you cannot mistake.  The two pads are stacked, A above
+    # B, which is what y_lead was sized for.
     if pad_probe:
         half_p = pad_size / 2.0
         x_a = x_out + lead - w
-        _box(cell, coil_layer, x_a, -half_p, x_a + pad_size, half_p)
-        _path(cell, coil_layer, [(x_out, 0.0), (x_a + half_p, 0.0)], w)
-        x_b = x_exit + w
-        _box(cell, coil_layer, x_b - pad_size, -half_p, x_b, half_p)
+        _box(cell, coil_layer, x_a, y_lead - half_p, x_a + pad_size,
+             y_lead + half_p)
+        _path(cell, coil_layer, [(x_out, y_lead), (x_a + half_p, y_lead)], w)
+        if inner_term:
+            _box(cell, coil_layer, x_exit - w, -half_p,
+                 x_exit - w + pad_size, half_p)
 
     # Terminals.  Without these the extracted coil has no named nodes, and
     # neither LVS nor a resistance extraction has anything to report.
     if lbl:
         size = grid(min(w, 2.0 * pad_out))
         x_a = x_out + lead + (pad_size / 2.0 - w if pad_probe else -w)
-        x_b = x_exit - (pad_size / 2.0 - w if pad_probe else 0.0)
-        _pin(cell, on_gate, "A", x_a, 0.0, size)
-        _pin(cell, on_gate, "B", x_b, 0.0, size)
+        _pin(cell, on_gate, "A", x_a, y_lead, size)
+        if inner_term:
+            x_b = x_exit + (pad_size / 2.0 - w if pad_probe else 0.0)
+            _pin(cell, on_gate, "B", x_b, 0.0, size)
 
     if value_text:
         # below the coil: the middle is taken by the via

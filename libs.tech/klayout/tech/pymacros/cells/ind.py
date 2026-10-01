@@ -15,15 +15,18 @@ assumption until somebody measures it.  At the 50 nm the models assume, an
 useless as a tank element until the gold is much thicker.  The cell reports
 that rather than hiding it.
 
-ONE KNOWN DRC RESIDUAL.  The circular series coil leaves seven violations at
-its inner terminal - five spacing, two width, all between 2.5 and 4.8 um
-against a 5 um rule.  A circular turn and the pad that takes its inner end
-away meet almost tangentially, and the slot between them narrows to nothing
-however the pad is shaped; it is a property of a curve meeting a straight
-edge, not of this particular drawing.  The square coil does not have it, and
-neither do the parallel rings.  If you need a circular coil, either open the
-gap up or accept the pinch and say so on the mask release.  Everything else in
-this library is DRC clean.
+ONE KNOWN DRC RESIDUAL.  The circular series coil leaves eight spacing
+violations at its inner terminal, between 4.3 and 5 um against a 5 um rule.
+The inner terminal is built out of rectangles - that is what was asked for,
+and it is what makes the square coil come out clean - and a rectangle leaving
+a curved track pinches against the turn spiralling past it however it is
+placed; the slot narrows to nothing because a curve and a straight edge meet
+tangentially, not because of this particular drawing.  The earlier leaning
+polygon traded those two microns for a seven-violation mix of spacing and
+width, which is the same problem wearing a different shape.  The square coil,
+the tank coil, the coils with probe pads and the parallel rings are all DRC
+clean.  If you need a circular coil, either open the gap up or accept the
+pinch and say so on the mask release.
 """
 
 import math
@@ -32,8 +35,9 @@ import sys
 
 import pya
 
-from .draw_ind import (circular_pitch, draw_rings, draw_spiral, path_length,
-                       ring_centrelines, spiral_with_leads)
+from .draw_ind import (circular_pitch, draw_rings, draw_spiral, lead_offset,
+                       path_length, ring_centrelines, spiral_with_leads)
+from .layers import IND_ID
 
 # tools/ sits at the root of the PDK, five levels up from this file.
 _TOOLS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -73,6 +77,32 @@ def _format_r(r_ohm):
     return "%.4gOhm" % r_ohm
 
 
+def _lvs_marker(cell, pts, w, l_nh):
+    """The ind.id marker: a rectangle across the track, on the longest
+    straight run of the centreline, whose overlap with the metal is l_nh um^2.
+
+    It reaches 1 um past each edge of the track so that it cuts the full
+    width whatever the rounding; the part over the gap touches no metal and
+    counts for nothing - magic reads only metal AND ind.id."""
+    length = round(l_nh / w, 2)                 # um, on the 10 nm grid
+    best = None
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        seg = math.hypot(x2 - x1, y2 - y1)
+        if seg >= length + 2 * w and (best is None or seg > best[0]):
+            best = (seg, x1, y1, x2, y2)
+    if best is None:
+        return False
+    seg, x1, y1, x2, y2 = best
+    ux, uy = (x2 - x1) / seg, (y2 - y1) / seg
+    cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+    a, b = length / 2.0, w / 2.0 + 1.0
+    corners = [(cx + sa * a * ux - sb * b * uy, cy + sa * a * uy + sb * b * ux)
+               for sa, sb in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    poly = pya.DPolygon([pya.DPoint(x, y) for x, y in corners])
+    cell.shapes(cell.layout().layer(IND_ID)).insert(poly)
+    return True
+
+
 class ind_igzo(pya.PCellDeclarationHelper):
     """Planar inductor: square or circular, one spiral or n rings in parallel."""
 
@@ -110,10 +140,23 @@ class ind_igzo(pya.PCellDeclarationHelper):
         self.param("lead", self.TypeDouble, "Terminal lead length",
                    default=40.0, unit="um")
         self.param("pad", self.TypeBoolean, "Probe pads", default=False)
+        # The inner end of a series spiral has to cross the turns to get out,
+        # which costs two openings in the dielectric and a run on the other
+        # metal.  Clear this and the coil is drawn with its outer terminal
+        # only - useful when the centre is tapped somewhere else, or when the
+        # coil is only ever a piece of a larger structure.
+        self.param("inner_term", self.TypeBoolean,
+                   "Inner (centre) terminal", default=True)
         self.param("pad_size", self.TypeDouble, "Pad size",
                    default=200.0, unit="um")
         self.param("show_value", self.TypeBoolean, "Print the value on the cell",
                    default=True)
+        # The coil is one continuous piece of metal, so to an extractor its two
+        # terminals are the same net and LVS reads a short.  ind.id cuts it:
+        # the metal under it becomes the ind_igzo device, and its area is the
+        # inductance, 1 um^2 per nH, the same encoding smd_cap uses.
+        self.param("lvs_id", self.TypeBoolean,
+                   "LVS marker (ind.id 71/0, series coils)", default=True)
         self.param("lbl", self.TypeBoolean, "Pins and labels (A, B)",
                    default=True)
 
@@ -195,8 +238,13 @@ class ind_igzo(pya.PCellDeclarationHelper):
     def _centreline(self):
         n = max(1, int(self.n))
         if self.topology == "series":
+            # the same lift draw_spiral gives the outer lead, so the length the
+            # resistance is computed from is the length that gets drawn
+            y_lead = lead_offset(self.w, self.gap, pad=self.pad,
+                                 pad_size=self.pad_size,
+                                 inner_term=self.inner_term)
             return spiral_with_leads(self.d_in, self.w, self.gap, n,
-                                     self.shape, self.lead)
+                                     self.shape, self.lead, y_lead)
         return ring_centrelines(self.d_in, self.w, self.gap, n, self.shape)
 
     # ------------------------------------------------------------- the PCell
@@ -222,7 +270,11 @@ class ind_igzo(pya.PCellDeclarationHelper):
             draw_spiral(self.cell, d_in=self.d_in, w=self.w, gap=self.gap,
                         n=self.n, shape=self.shape, on_gate=on_gate,
                         lead=self.lead, pad=self.pad, pad_size=self.pad_size,
-                        lbl=self.lbl, value_text=text)
+                        lbl=self.lbl, value_text=text,
+                        inner_term=self.inner_term)
+            if self.lvs_id and self.l_series > 0:
+                _lvs_marker(self.cell, self._centreline(), self.w,
+                            self.l_series)
         else:
             draw_rings(self.cell, d_in=self.d_in, w=self.w, gap=self.gap,
                        n=self.n, shape=self.shape, on_gate=on_gate,
