@@ -22,7 +22,7 @@ v {xschem version=3.4.5 file_version=1.2
 G {}
 K {type=inductor
 format="@spiceprefix@name @pinlist @model ls=@ls rs=@rs"
-lvs_format="@spiceprefix@name @pinlist @model ls=@ls rs=@rs"
+lvs_format="@spiceprefix@name @pinlist @model ls=@ls"
 template="name=L1
 ls=16.38n
 rs=375.8

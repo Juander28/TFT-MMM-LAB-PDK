@@ -19,7 +19,8 @@
 #  10. magic    - a dielectric opening under gate metal really is a via
 #  11. ngspice  - TFT, capacitor and inductor together resonate where they should
 #      (plus a connectivity check on the passives, after an inner ring was
-#       once left floating by a bus that started in the wrong place)
+#       once left floating by a bus that started in the wrong place, and a
+#       check that the coils' terminals are rectangles and nothing else)
 #
 # Exits non-zero on the first failure.
 set -e
@@ -66,7 +67,13 @@ KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" \
     || { cat "${WORK}/discover.log"; fail "klayout discovery"; }
 
 # --- 3. DRC ------------------------------------------------------------------
-for cell in tft_igzo_l10w100_pad tft_igzo_l5w10 cap_mim_400x400; do
+# The square coils are on this list because the inner terminal is built out of
+# rectangles that have to line up with each other and with the track; if one of
+# them slips, the spacing rule is what says so.  The circular series coil is
+# NOT on it - see the DRC residual noted in ind.py.
+for cell in tft_igzo_l10w100_pad tft_igzo_l5w10 cap_mim_400x400 \
+            ind_igzo_square_series ind_igzo_square_series_pad \
+            ind_igzo_square_parallel ind_igzo_tank_100mhz; do
     python3 "${ROOT}/libs.tech/klayout/tech/drc/run_drc.py" \
         --path "${GDS_PRIM}" --topcell "${cell}" --output "${WORK}" \
         > "${WORK}/drc_${cell}.log" 2>&1 \
@@ -230,7 +237,7 @@ root = os.environ["PDKPATH"]
 sys.path.insert(0, os.path.join(root, "tools"))
 sys.path.insert(0, os.path.join(root, "libs.tech", "klayout", "tech", "pymacros"))
 import coil_core as cc
-from cells.draw_ind import path_length, spiral_with_leads
+from cells.draw_ind import lead_offset, path_length, spiral_with_leads
 
 lib = pya.Library.library_by_name("igzo_mmm_lab_pr")
 decl = lib.layout().pcell_declaration("ind_igzo")
@@ -245,8 +252,10 @@ want = cc.inductance_microcoil(100e-6, 10e-6, 5e-6, 8, 50e-9, "cuadrada", "mohan
 got = float(txt[0].split()[1].replace("nH", "")) * 1e-9
 assert abs(got - want) / want < 0.01, "PCell says %g H, coil_core says %g H" % (got, want)
 
-# the drawn track and the length the estimate used are the same track
-drawn = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0))
+# the drawn track and the length the estimate used are the same track - lead
+# offset included, which is real metal and a good 25 um of it
+drawn = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0,
+                                      lead_offset(10.0, 5.0)))
 assert drawn > 7000.0, "drawn length looks wrong: %g um" % drawn
 print("ind_igzo: %.2f nH, %.0f um of track, matches coil_core" % (got * 1e9, drawn))
 PY
@@ -282,6 +291,41 @@ for shape in ("square", "circular"):
     assert n == 2, "%s spiral: %d pieces on gate, expected 2" % (shape, n)
     n = pieces("ind_igzo", {"shape": shape, "topology": "series"}, (6, 0))
     assert n == 1, "%s spiral: underpass in %d pieces" % (shape, n)
+
+# Clear the inner terminal and the underpass goes with it: one piece of coil
+# metal, nothing at all on the other metal, and no openings.
+for shape in ("square", "circular"):
+    params = {"shape": shape, "topology": "series", "inner_term": False}
+    n = pieces("ind_igzo", params, (2, 0))
+    assert n == 1, "%s spiral, no inner terminal: %d pieces on gate" % (shape, n)
+    for layer, what in (((6, 0), "underpass"), ((5, 0), "openings")):
+        n = pieces("ind_igzo", params, layer)
+        assert n == 0, "%s spiral, no inner terminal: %s still drawn" % (shape,
+                                                                        what)
+
+# Nothing the inner terminal is made of may be anything but a rectangle.  The
+# square coil is Manhattan end to end, so a single oblique edge anywhere on it
+# is a polygon that crept back in; the circular coil's own track is oblique by
+# definition, so only its underpass and its openings are held to this.
+def oblique(pcell, params, layer):
+    decl = lib.layout().pcell_declaration(pcell)
+    ly = pya.Layout(); ly.dbu = 0.001
+    cell = ly.cell(ly.add_pcell_variant(lib, decl.id(), params))
+    reg = pya.Region(cell.begin_shapes_rec(ly.layer(pya.LayerInfo(*layer))))
+    return sum(1 for poly in reg.each() for e in poly.each_edge()
+               if e.dx() != 0 and e.dy() != 0)
+
+for params in ({"shape": "square", "topology": "series"},
+               {"shape": "square", "topology": "series", "pad": True},
+               {"shape": "square", "topology": "parallel"},
+               {"shape": "square", "topology": "series", "n": 16, "d_in": 400.0,
+                "w": 20.0, "gap": 10.0}):
+    for layer in ((2, 0), (6, 0), (5, 0)):
+        n = oblique("ind_igzo", params, layer)
+        assert n == 0, "%s: %d oblique edges on %s" % (params, n, layer)
+for layer in ((6, 0), (5, 0)):
+    n = oblique("ind_igzo", {"shape": "circular", "topology": "series"}, layer)
+    assert n == 0, "circular coil: %d oblique edges on %s" % (n, layer)
 
 # A folded transistor is nf+1 separate electrodes until the straps tie them
 # together; strapped, it must be exactly two - source and drain.
@@ -321,7 +365,8 @@ for shape in ("square", "circular"):
         assert (grown - gate).is_empty(), \
             "%s coil: the outer via is not well inside its gate pad" % shape
         assert (grown - sd).is_empty() or True, "checked against gate"
-print("every passive is connected the way it is meant to be, vias inside their pads")
+print("every passive is connected the way it is meant to be, vias inside their "
+      "pads, and the coils are rectangles")
 PY
 KLAYOUT_PATH="${HOME}/.klayout:${PDKPATH}/libs.tech/klayout" \
     "${KLAYOUT}" -z -nc -r "${WORK}/conn.py" > "${WORK}/conn.log" 2>&1 \
@@ -343,7 +388,7 @@ import pya
 root = os.environ["PDKPATH"]
 sys.path.insert(0, os.path.join(root, "tools"))
 sys.path.insert(0, os.path.join(root, "libs.tech", "klayout", "tech", "pymacros"))
-from cells.draw_ind import path_length, spiral_with_leads
+from cells.draw_ind import lead_offset, path_length, spiral_with_leads
 
 tech = open(os.path.join(root, "libs.tech", "magic", "igzo_mmm_lab.tech")).read()
 r_sheet = float(re.search(r"^\s*resist gatemet\s+([\d.]+)", tech, re.M).group(1)) / 1000.0
@@ -355,9 +400,10 @@ cell = ly.cell(ly.add_pcell_variant(lib, decl.id(), {}))
 txt = [s.text.string for s in cell.shapes(ly.layer(63, 0)).each()][0]
 r_cell = float(re.search(r"/ ([\d.]+)Ohm", txt).group(1))
 
-squares = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0)) / 10.0
+squares = path_length(spiral_with_leads(100.0, 10.0, 5.0, 8, "square", 40.0,
+                                        lead_offset(10.0, 5.0))) / 10.0
 r_magic = squares * r_sheet
-assert abs(r_magic - r_cell) / r_cell < 0.02, (
+assert abs(r_magic - r_cell) / r_cell < 0.001, (
     "the coil says %.1f Ohm, the techfile's sheet resistance says %.1f" %
     (r_cell, r_magic))
 print("sheet resistance agrees: %.0f squares x %.3f Ohm/sq = %.1f Ohm, cell says %.1f"
@@ -454,6 +500,219 @@ print("tank: TFT + cap_mim + ind_igzo resonate at %.1f MHz" % f)
 PY
 [ $? -eq 0 ] && pass "ngspice: the three cells together resonate at 100 MHz" \
              || fail "the tank testbench"
+
+# --- 12. the testbench suite -------------------------------------------------
+# Every schematic in tests/ has to netlist and then run in batch.  The trap
+# these guard against is a testbench that uses ngspice's interactive `plot`:
+# it netlists fine, runs without error, and produces nothing at all.
+run_tb() {                 # run_tb <name>
+    ( cd "${WORK}" && xschem -n -q --rcfile "${WORK}/xschemrc" \
+        "${ROOT}/libs.tech/xschem/tests/$1.sch" >> "${WORK}/xschem.log" 2>&1 ) || true
+    [ -s "${WORK}/$1.spice" ] || fail "$1 did not netlist"
+    # A testbench SHOULD plot - that is how it is read at a prompt, and every
+    # one of these draws its signals.  What it must not do is plot
+    # unconditionally: under `ngspice -b` an interactive plot draws nothing
+    # and takes the run with it.  So the rule is not "no plot", it is "no
+    # plot outside the batch guard".
+    if grep -qE '^[[:space:]]*plot ' "${WORK}/$1.spice"; then
+        grep -q 'batchmode' "${WORK}/$1.spice" \
+            || fail "$1 plots without an 'if \$?batchmode = 0' guard"
+    fi
+    ( cd "${WORK}" && ngspice -b "$1.spice" > "${WORK}/$1.out" 2>&1 ) || true
+    [ -s "${WORK}/$1.raw" ] || fail "$1 ran but wrote no raw file"
+    # A trailing `grep && {...}` would return 1 when it matches nothing, and
+    # under `set -e` that ends the whole script without a word.  if/fi
+    # returns 0 either way.
+    if grep -qiE "^ *error|fatal" "${WORK}/$1.out"; then
+        sed -n "1,40p" "${WORK}/$1.out"
+        fail "$1 reported an error"
+    fi
+}
+
+# 12a. transfer curves: the contact, and what it does to a Vth extraction
+run_tb tft_transfer
+python3 - "${WORK}/tft_transfer.out" <<'PY'
+import re
+import sys
+t = open(sys.argv[1]).read()
+def get(k):
+    m = re.search(k + r"\s*=\s*([-\d.eE+]+)", t)
+    assert m, "%s missing from the transfer run" % k
+    return float(m.group(1))
+gm = get("gm_peak")
+assert 1.5e-4 < gm < 1.7e-4, "peak gm is %g S, expected 1.6e-4" % gm
+share = get("contact_share")
+assert 0.10 < share < 0.15, "contact is %.1f percent of the long-channel R" % (100*share)
+vth = get("vth_lin")
+# The best-corner Vto is +0.09 V and the extraction cannot return it: an
+# eighth of the drain bias sits on the contacts.  Assert the bias is there.
+assert vth < -0.3, "extracted Vth is %g V - the contact bias has gone" % vth
+print("transfer: peak gm %.3g S, %.0f percent of the long-channel R is contact, "
+      "and it drags the extracted Vth to %.2f V" % (gm, 100*share, vth))
+PY
+[ $? -eq 0 ] && pass "xschem/ngspice: transfer curves, and the contact in them" \
+             || fail "the transfer testbench"
+
+# 12b. C-V: the overlap the wrapper puts there, recovered exactly
+run_tb tft_cv
+python3 - "${WORK}/tft_cv.out" <<'PY'
+import re
+import sys
+t = open(sys.argv[1]).read()
+def get(k):
+    m = re.search(k + r"\s*=\s*([-\d.eE+]+)", t)
+    assert m, "%s missing from the C-V run" % k
+    return float(m.group(1))
+# 2 * cox_area * ov * W, with cox_area = 1.564e-3 F/m^2
+for ov, key in ((2e-6, "d2_lo"), (5e-6, "d5_lo"), (10e-6, "d10_lo")):
+    want = 2 * 1.564e-3 * ov * 1000e-6
+    got = get(key)
+    assert abs(got - want) / want < 1e-3, \
+        "ov = %g um: C-V says %g F, the wrapper puts %g F" % (ov*1e6, got, want)
+lo, hi = get("d5_lo"), get("d5_10m")
+assert hi < 0.5 * lo, "the contact should have eaten the overlap by 10 MHz"
+print("C-V: the overlap is %.2f pF at 1 kHz - exactly 2*Cox*ov*W - and the "
+      "contact has taken it to %.2f pF by 10 MHz" % (lo*1e12, hi*1e12))
+PY
+[ $? -eq 0 ] && pass "ngspice C-V: the overlap is 2*Cox*ov*W, until the contact takes it" \
+             || fail "the C-V testbench"
+
+# 12c. the magnetic field, and how far it is from measurable
+run_tb tft_bfield
+python3 - "${WORK}/tft_bfield.out" <<'PY'
+import re
+import sys
+t = open(sys.argv[1]).read()
+def get(k):
+    m = re.search(r"\b" + k + r"\s*=\s*([-\d.eE+]+)", t)
+    assert m, "%s missing from the b-field run" % k
+    return float(m.group(1))
+d1 = get("d1")
+assert 0 < d1 < 1e-6, "classical B = 1 T moved the current by %g - too much" % d1
+d1k = get("d1k")
+assert 0.05 < d1k < 0.2, "b_scale = 1000 gives %g, expected ~0.09" % d1k
+print("B = 1 T moves the current by %.1e classically; it takes b_scale = 1000 "
+      "to reach %.1f percent" % (d1, 100 * d1k))
+PY
+[ $? -eq 0 ] && pass "ngspice: the field term is present, classical, and not a sensor" \
+             || fail "the b-field testbench"
+
+# 12d. the diode-connected TFT - the only rectifier this process has
+run_tb tft_diode
+python3 - "${WORK}/tft_diode.out" <<'PY'
+import re
+import sys
+t = open(sys.argv[1]).read()
+def get(k):
+    m = re.search(k + r"\s*=\s*([-\d.eE+]+)", t)
+    assert m, "%s missing from the diode run" % k
+    return float(m.group(1))
+v1u = get("v_at_1u")
+assert 0.1 < v1u < 0.5, "turn-on at %g V" % v1u
+rd = get("rd_at_5")
+assert 6.6e3 < rd < 9e3, "dynamic resistance %g Ohm" % rd
+i6 = get("i6_max")
+assert i6 > 5e-3, "the W = 6 mm rectifier device carries only %g A" % i6
+print("diode: 1 uA at %.2f V, r_dyn %.1f kOhm at 5 V (6.6 k of it contact), "
+      "and the 6 mm rectifier device carries %.2f mA" % (v1u, rd/1e3, i6*1e3))
+PY
+[ $? -eq 0 ] && pass "ngspice: the diode-connected TFT rectifies, contact-limited" \
+             || fail "the diode testbench"
+
+# 12d-bis. the ESTIMATED C-V model, and the two properties that make it
+# usable: the accumulated case must return EXACTLY to the measured oxide
+# value, and the film thickness must actually be an instance parameter.  Both
+# were broken on the first attempt and both failed silently.
+run_tb tft_cv_estimated
+python3 - "${WORK}/tft_cv_estimated.out" <<'PY'
+import re
+import sys
+t = open(sys.argv[1]).read()
+def get(k):
+    m = re.search(k + r"\s*=\s*([-\d.eE+]+)", t)
+    assert m, "%s missing from the estimated C-V run" % k
+    return float(m.group(1))
+ox, dep, acc, thin = (get("c_ox_lo"), get("c_dep_lo"), get("c_acc_lo"),
+                      get("c_thin_lo"))
+err = get("err_acc")
+assert abs(err) < 1e-9, \
+    "acc=1 gives %g, not the measured oxide value - the wrapper has changed " \
+    "something it should not have" % acc
+assert 0.80 < dep / ox < 0.92, \
+    "the depleted estimate is %.3f of the oxide, expected about 0.86" % (dep/ox)
+assert thin > dep * 1.02, \
+    "t_igzo is not reaching the wrapper: 15 nm gives the same answer as 30 nm"
+print("estimated C-V: depleted is %.1f %% of the oxide-only value, "
+      "accumulated returns to it exactly, and halving the film moves it to "
+      "%.1f %%" % (100 * dep / ox, 100 * thin / ox))
+PY
+[ $? -eq 0 ] && pass "ngspice: the estimated C-V model brackets the oxide, and its film thickness works" \
+             || fail "the estimated C-V testbench"
+
+# 12e. the two older testbenches run in batch too, so that 12f below has a
+# raw file from every one of them to check the graphs against.  tft_iv is
+# netlisted in check 4 but never run, and check 11 runs a rewritten copy of
+# tank_ac - neither leaves a raw file behind under its own name.
+run_tb tft_iv
+run_tb tank_ac
+pass "ngspice: every testbench in tests/ runs in batch and writes a raw file"
+
+# 12f. the index is generated, and every box descends into a schematic
+python3 - "${ROOT}" "${WORK}" <<'PY'
+import os
+import re
+import sys
+tests = os.path.join(sys.argv[1], "libs.tech", "xschem", "tests")
+work = sys.argv[2]
+top = os.path.join(tests, "0_top.sch")
+assert os.path.exists(top), "0_top.sch has not been generated"
+refs = re.findall(r"C \{tests/(\S+)\.sym\}", open(top).read())
+assert refs, "the index holds no testbenches"
+for name in refs:
+    for ext in (".sym", ".sch"):
+        p = os.path.join(tests, name + ext)
+        assert os.path.exists(p), "the index points at a missing %s" % p
+    assert "type=subcircuit" in open(os.path.join(tests, name + ".sym")).read(), \
+        "%s.sym is not type=subcircuit, so 'e' will not descend into it" % name
+    # Every testbench draws its own signals on the sheet.  Without this the
+    # only way to see a result is to read numbers out of a log.
+    sch = open(os.path.join(tests, name + ".sch")).read()
+    assert "flags=graph" in sch, "%s.sch has no embedded graph" % name
+    assert "autoload=1" in sch, \
+        "%s.sch has a graph that does not load itself after a run" % name
+    # autoload does nothing without a rawfile to load: xschem substitutes
+    # $netlist_dir at draw time and reads that file when the run ends.
+    assert "rawfile=$netlist_dir/%s.raw" % name in sch, \
+        "%s.sch has autoload but names no rawfile, so it will stay empty" % name
+    # Every signal a graph names must be IN the raw file this testbench just
+    # wrote.  Two ways to get this wrong, both silent: computing a vector
+    # after the `write`, and asking for `id` when ngspice stored it as
+    # `i(id)` because its type is current.  A graph that names a vector the
+    # raw does not hold simply draws an empty box.
+    raw = os.path.join(work, name + ".raw")
+    if os.path.exists(raw):
+        # Read up to the Binary: marker - the variable table sits above it
+        # and can be long.  A fixed-size peek misses the tail of it.
+        blob = open(raw, "rb").read(200000).decode("latin-1")
+        head = blob.split("Binary:")[0].split("Values:")[0]
+        # Each variable line is "\t<index>\t<name>\t<type>"; a single
+        # \t(\S+)\t consumes the separators and returns the index, not the
+        # name.  Anchor on the index and take the field after it.
+        have = set(m[1] for m in
+                   re.findall(r"^\s*(\d+)\s+(\S+)\s", head, re.M))
+        for block in re.findall(r'node="([^"]*)"', sch):
+            for node in block.split("\n"):
+                node = node.strip()
+                if not node:
+                    continue
+                assert node in have, (
+                    "%s.sch graphs %s, which is not in %s.raw - it will draw "
+                    "an empty box" % (name, node, name))
+print("index: %d testbenches, every symbol descends into its schematic and "
+      "every sheet draws its own signals" % len(refs))
+PY
+[ $? -eq 0 ] && pass "xschem: the test index is complete and descends" \
+             || fail "the test index"
 
 echo
 echo "All checks passed."
