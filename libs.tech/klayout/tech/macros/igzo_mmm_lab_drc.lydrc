@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>Run DRC (igzo_mmm_lab)</description>
+ <version>0.1</version>
+ <category>drc</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name/>
+ <menu-path>igzo_menu&gt;end("IGZO MMM-LAB PDK").end</menu-path>
+ <interpreter>dsl</interpreter>
+ <dsl-interpreter-name>drc-dsl-xml</dsl-interpreter-name>
+ <text>
+# The "IGZO MMM-LAB PDK" menu, next to Help - the same arrangement as the
+# gf180mcu PDK's own menu.  This entry runs the PDK's DRC deck,
+# libs.tech/klayout/tech/drc/igzo_mmm_lab.drc, on the layout that is open.
+#
+# The deck needs nothing passed to it here: with no $input it checks the
+# current layout, and with no $report it opens the result in KLayout's marker
+# browser.  Run from the command line the same deck takes -rd input= and
+# -rd report= instead (drc/run_drc.py does that).
+#
+# Like gf180mcu's macro this finds the deck through its own file: klayout
+# rewrites __dir__ for macros, so File.dirname(__FILE__) is used, with
+# $PDK_ROOT/$PDK as the fallback.
+here = File.dirname(File.expand_path(__FILE__))
+deck = File.expand_path(File.join(here, "..", "drc", "igzo_mmm_lab.drc"))
+unless File.exist?(deck)
+  deck = File.join(ENV["PDK_ROOT"].to_s, ENV["PDK"].to_s,
+                   "libs.tech", "klayout", "tech", "drc", "igzo_mmm_lab.drc")
+end
+raise "igzo_mmm_lab DRC deck not found (looked next to this macro and under $PDK_ROOT/$PDK)" \
+  unless File.exist?(deck)
+self.instance_eval(File.read(deck), deck)
+</text>
+</klayout-macro>

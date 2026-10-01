@@ -44,6 +44,7 @@ planes
     sd,s
     gate,g
     comment,c
+    smd,sm
 end
 
 #-----------------------------------------------------------------------------
@@ -54,12 +55,21 @@ types
     active  tftfet,tft
     active  sdc,sdcontact
     sd      sdmet,sdmetal,sdm
+    sd      sdind
     gate    gatemet,gatemetal,g
+    gate    gateind
     gate    gsvia,gatesdvia
     comment oxetch,dielectric_opening
     comment text,annotation
     comment align,alignment
     comment comment
+    # Surface-mount parts.  Nothing here is fabricated: an SMD component is
+    # soldered or glued on afterwards.  These markers exist so that extraction
+    # and LVS can see the part - see the smd_cap notes in the extract section.
+    smd     smdcap,smdbody
+    smd     smdwire,smdterm
+    smd     smdtg
+    smd     smdts
 end
 
 #-----------------------------------------------------------------------------
@@ -72,6 +82,10 @@ contact
     # source/drain metal.  Same idea as sdc: the overlap is the contact, the
     # only difference is that here the opening has to be drawn.
     gsvia sdmet gatemet
+    # Where a surface-mount terminal marker lands on a pad it ties the marker
+    # to that metal - gate pad or S/D pad.
+    smdtg smdwire gatemet
+    smdts smdwire sdmet
 end
 
 #-----------------------------------------------------------------------------
@@ -89,13 +103,14 @@ end
 # drain either - it is the device.
 #-----------------------------------------------------------------------------
 connect
-    sdmet,sdc,gsvia sdmet,sdc,gsvia
+    sdmet,sdc,gsvia,smdts sdmet,sdc,gsvia,smdts
     igzo,sdc        igzo,sdc
     # The channel type holds the gate connection: painting gate over IGZO
     # turns that tile into tftfet, and without listing it here the gate stripe
     # would be cut in two where it crosses the island.  Same reason gf180mcu
     # writes "connect *poly,allfets *poly,allfets".
-    gatemet,tftfet,gsvia  gatemet,tftfet,gsvia
+    gatemet,tftfet,gsvia,smdtg  gatemet,tftfet,gsvia,smdtg
+    smdwire,smdtg,smdts   smdwire,smdtg,smdts
 end
 
 #-----------------------------------------------------------------------------
@@ -113,6 +128,12 @@ styles
     align   comment
     text    comment
     comment comment
+    smdcap  pwell
+    smdwire metal3
+    smdtg   metal3 contact_X'es
+    smdts   metal3 contact_X'es
+    gateind polysilicon ptransistor_stripes
+    sdind   metal1 ptransistor_stripes
 end
 
 #-----------------------------------------------------------------------------
@@ -135,7 +156,7 @@ style gdsii
 	labels igzo
 	calma 4 0
 
- layer SD sdmet,sdc,gsvia
+ layer SD sdmet,sdc,gsvia,smdts,sdind
 	labels sdmet
 	calma 6 0
 
@@ -146,7 +167,7 @@ style gdsii
  layer OXETCH oxetch,gsvia
 	calma 5 0
 
- layer GATE gatemet,tftfet,gsvia
+ layer GATE gatemet,tftfet,gsvia,smdtg,gateind
 	labels gatemet
 	calma 2 0
 
@@ -160,6 +181,15 @@ style gdsii
  layer TEXT text
 	labels text
 	calma 63 0
+
+ layer SMDBODY smdcap
+	calma 70 0
+
+ layer SMDTERM smdwire,smdtg,smdts
+	calma 70 1
+
+ layer INDID gateind,sdind
+	calma 71 0
 
 end
 
@@ -196,9 +226,38 @@ style import
  templayer viacut viaarea
 	and GATE
 
+ templayer smdgarea SMDTERM
+	and GATE
+
+ templayer smdsarea SMDTERM
+	and SD
+	and-not GATE
+
+ layer smdtg smdgarea
+
+ layer smdts smdsarea
+
+ layer smdwire SMDTERM
+	and-not GATE
+	and-not SD
+
+ layer smdcap SMDBODY
+
+ # the stretch of coil track under ind.id is the inductor device, not wire
+ layer gateind GATE
+	and INDID
+	and-not viacut
+
+ layer sdind SD
+	and INDID
+	and-not GATE
+	and-not IGZO
+
  layer sdmet SD
 	and-not IGZO
 	and-not viacut
+	and-not smdsarea
+	and-not INDID
 	labels SD
 	labels SDPIN port
 
@@ -206,6 +265,8 @@ style import
 
  layer gatemet GATE
 	and-not viacut
+	and-not smdgarea
+	and-not INDID
 	labels GATE
 	labels GATEPIN port
 
@@ -225,6 +286,9 @@ style import
  calma GATEPIN 2 10
  calma ALIGN   8 0
  calma TEXT   63 0
+ calma SMDBODY 70 0
+ calma SMDTERM 70 1
+ calma INDID   71 0
 
 end
 
@@ -288,6 +352,7 @@ extract
  planeorder sd      1
  planeorder gate    2
  planeorder comment 3
+ planeorder smd     4
 
  # Film thicknesses: 30 nm IGZO, Au electrodes, 50 nm Al2O3, Au gate.
  height igzo,tftfet,sdc  0.00  0.03
@@ -332,6 +397,26 @@ extract
  # extraction to report roughly 13 % more; libs.tech/netgen/setup.tcl allows
  # for it.  Drawing the island flush with the electrodes makes it exact.
  device msubcircuit igzo_tft tftfet sdc,igzo sdc,igzo l=l w=w
+
+ # THE SURFACE-MOUNT CAPACITOR.  Nothing on the mask makes it, so the value
+ # cannot come from geometry the way cap_mim's does.  The smd_cap PCell
+ # therefore draws two marker layers that are never fabricated: SMDTERM
+ # (70/1) runs from each pad towards the middle - where it lies over pad
+ # metal it becomes smdtg or smdts and ties the marker to that pad - and
+ # SMDBODY (70/0) closes the gap between the two runs.  The body's AREA is
+ # the value: 1 um^2 per nF, drawn exactly by the PCell on the 10 nm grid
+ # (magic reports area in m^2, hence the 1e3).  So the device extracts with
+ # the value typed into the PCell, and netgen compares it with the schematic.
+ device rsubcircuit smd_cap smdcap smdwire,smdtg,smdts a=c*1E3
+
+ # THE PLANAR INDUCTOR.  A coil is one continuous track, so without help its
+ # two terminals extract as one net and LVS sees a short.  The ind_igzo PCell
+ # lays an ind.id marker (71/0) across one straight stretch of the track; the
+ # metal under it is read as gateind or sdind, which does not connect to the
+ # rest of the metal, and becomes the ind_igzo device between the two
+ # pieces.  Its area is the inductance the PCell computed, 1 um^2 per nH.
+ device rsubcircuit ind_igzo gateind gatemet a=ls*1E3
+ device rsubcircuit ind_igzo sdind sdmet a=ls*1E3
 
 end
 

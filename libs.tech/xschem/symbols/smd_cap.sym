@@ -1,0 +1,41 @@
+v {xschem version=3.4.5 file_version=1.2
+
+* Surface-mount capacitor - UCI/INRF process
+*
+* Drawing after xschem's own devices/capa.sym (GPL-2.0, Stefan Frederik
+* Schippers).
+*
+* Two pins, in the order the subcircuit declares them:
+*     .subckt smd_cap p m c=1u esr=10m
+* The part is bought, not made: the layout draws its two pads with the
+* smd_cap PCell, whose value field must match c here.  LVS compares c to 1 %
+* (the PCell encodes it in its smd.body marker); esr is for simulation only.
+}
+G {}
+K {type=capacitor
+format="@spiceprefix@name @pinlist @model c=@c esr=@esr"
+lvs_format="@spiceprefix@name @pinlist @model c=@c"
+template="name=C1
+c=10u
+esr=10m
+package=0603
+model=smd_cap
+spiceprefix=X
+"
+}
+V {}
+S {}
+E {}
+L 4 0 5 0 30 {}
+L 4 0 -30 0 -5 {}
+L 4 -10 -5 10 -5 {}
+L 4 -10 5 10 5 {}
+L 4 -14 -12 -14 12 {}
+L 4 14 -12 14 12 {}
+B 5 -2.5 -32.5 2.5 -27.5 {name=p dir=inout}
+B 5 -2.5 27.5 2.5 32.5 {name=m dir=inout}
+T {p} -8 -25 0 1 0.15 0.15 {layer=7}
+T {m} -8 17.5 0 1 0.15 0.15 {layer=7}
+T {@name} 18 -18.75 0 0 0.2 0.2 {}
+T {@c @package} 18 -6.25 0 0 0.2 0.2 {}
+T {SMD esr=@esr} 18 6.25 0 0 0.2 0.2 {}

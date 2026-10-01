@@ -9,9 +9,10 @@ from igzo_mmm_lab.lym at KLayout start-up.
 import pya
 
 from .ind import ind_igzo
+from .smd import smd_cap_pads
 from .tft import cap_mim, tft_igzo
 
-__all__ = ["igzo_mmm_lab_pr", "tft_igzo", "cap_mim", "ind_igzo"]
+__all__ = ["igzo_mmm_lab_pr", "tft_igzo", "cap_mim", "ind_igzo", "smd_cap_pads"]
 
 
 class igzo_mmm_lab_pr(pya.Library):
@@ -23,5 +24,6 @@ class igzo_mmm_lab_pr(pya.Library):
         self.layout().register_pcell("tft_igzo", tft_igzo())
         self.layout().register_pcell("cap_mim", cap_mim())
         self.layout().register_pcell("ind_igzo", ind_igzo())
+        self.layout().register_pcell("smd_cap_pads", smd_cap_pads())
 
         self.register("igzo_mmm_lab_pr")

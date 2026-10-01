@@ -19,3 +19,8 @@ gate       LABEL                       2    20
 align      drawing                     8     0
 # not a mask: the value a parametric cell prints on itself
 text       drawing                    63     0
+# not masks: surface-mount part markers for extraction and LVS (cells/smd.py)
+smd        drawing                    70     0
+smd        TERM                       70     1
+# not a mask: inductor marker for extraction and LVS (cells/ind.py, lvs_id)
+ind        drawing                    71     0
