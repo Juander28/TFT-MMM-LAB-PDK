@@ -76,6 +76,8 @@ def _ind_rows(src):
         ["t_metal", "0.05 um", "metal thickness - the lever on R", src["a"]],
         ["f_eval", "100 MHz", "frequency the R_ac and Q read-outs use", src["d"]],
         ["lead", "40 um", "terminal lead length", src["d"]],
+        ["inner_term", "on", "the centre connection: off leaves one terminal",
+         src["d"]],
         ["pad", "off", "probe pad on each terminal", src["d"]],
         ["pad_size", "200 um", "pad side", src["d"]],
         ["lbl", "on", "pins and labels A and B - needed for extraction", src["d"]],
@@ -173,8 +175,8 @@ EN = {
         "included, rather than from a closed form for it.",
     "ind_topo": [
         ["shape / topology", "L", "R at 100 MHz", "Q"],
-        ["square, series", "16.38 nH", "377.7 Ohm", "0.03"],
-        ["circular, series", "20.59 nH", "312.6 Ohm", "0.04"],
+        ["square, series", "16.38 nH", "379.0 Ohm", "0.03"],
+        ["circular, series", "20.59 nH", "313.9 Ohm", "0.04"],
         ["square, parallel", "129.6 pH", "5.00 Ohm", "0.02"],
         ["circular, parallel", "129.5 pH", "3.87 Ohm", "0.02"],
     ],
@@ -186,11 +188,11 @@ EN = {
     "h_thick": "The number that decides whether any of this is usable",
     "thick": [
         ["gold thickness", "R at 100 MHz", "Q", ""],
-        ["50 nm (assumed today)", "377.7 Ohm", "0.03", ""],
-        ["100 nm", "188.9 Ohm", "0.05", ""],
-        ["250 nm", "75.5 Ohm", "0.14", ""],
-        ["500 nm", "37.8 Ohm", "0.27", ""],
-        ["1 um", "18.9 Ohm", "0.54", ""],
+        ["50 nm (assumed today)", "379.0 Ohm", "0.03", ""],
+        ["100 nm", "189.5 Ohm", "0.05", ""],
+        ["250 nm", "75.8 Ohm", "0.14", ""],
+        ["500 nm", "37.9 Ohm", "0.27", ""],
+        ["1 um", "18.95 Ohm", "0.54", ""],
     ],
     "thick_txt":
         "Same coil, same inductance, thickness swept.  At the 50 nm the process\n"
@@ -327,8 +329,8 @@ ES = {
         "salidas incluidas, no con una formula cerrada para ella.",
     "ind_topo": [
         ["forma / topologia", "L", "R a 100 MHz", "Q"],
-        ["cuadrada, serie", "16.38 nH", "377.7 Ohm", "0.03"],
-        ["circular, serie", "20.59 nH", "312.6 Ohm", "0.04"],
+        ["cuadrada, serie", "16.38 nH", "379.0 Ohm", "0.03"],
+        ["circular, serie", "20.59 nH", "313.9 Ohm", "0.04"],
         ["cuadrada, paralelo", "129.6 pH", "5.00 Ohm", "0.02"],
         ["circular, paralelo", "129.5 pH", "3.87 Ohm", "0.02"],
     ],
@@ -341,11 +343,11 @@ ES = {
     "h_thick": "El numero que decide si algo de esto sirve",
     "thick": [
         ["espesor de oro", "R a 100 MHz", "Q", ""],
-        ["50 nm (lo supuesto hoy)", "377.7 Ohm", "0.03", ""],
-        ["100 nm", "188.9 Ohm", "0.05", ""],
-        ["250 nm", "75.5 Ohm", "0.14", ""],
-        ["500 nm", "37.8 Ohm", "0.27", ""],
-        ["1 um", "18.9 Ohm", "0.54", ""],
+        ["50 nm (lo supuesto hoy)", "379.0 Ohm", "0.03", ""],
+        ["100 nm", "189.5 Ohm", "0.05", ""],
+        ["250 nm", "75.8 Ohm", "0.14", ""],
+        ["500 nm", "37.9 Ohm", "0.27", ""],
+        ["1 um", "18.95 Ohm", "0.54", ""],
     ],
     "thick_txt":
         "La misma bobina, la misma inductancia, barriendo el espesor.  Con los\n"
@@ -424,7 +426,7 @@ EXTRA_EN = {
         "The techfile carries the sheet resistance - 488 mOhm/square, which is\n"
         "gold at the assumed 50 nm - so anything that uses it gets the right\n"
         "number, and run_checks.sh asserts that it agrees with what the coil\n"
-        "cell reports: 774 squares x 0.488 = 377.7 Ohm, which is what ind_igzo\n"
+        "cell reports: 777 squares x 0.488 = 379.0 Ohm, which is what ind_igzo\n"
         "prints on itself.  Change the thickness and both move together.\n\n"
         "What does not work is magic's extresist pipeline.  On a coil it warns\n"
         "that the two ports are electrically shorted - which is true, a coil is\n"
@@ -479,7 +481,7 @@ EXTRA_ES = {
         "El techfile lleva la resistencia de hoja - 488 mOhm/cuadro, que es oro\n"
         "con los 50 nm supuestos - asi que lo que la use obtiene el numero\n"
         "correcto, y run_checks.sh verifica que coincide con lo que reporta la\n"
-        "celda de la bobina: 774 cuadros x 0.488 = 377.7 Ohm, que es lo que\n"
+        "celda de la bobina: 777 cuadros x 0.488 = 379.0 Ohm, que es lo que\n"
         "ind_igzo escribe sobre si misma.  Cambia el espesor y las dos se\n"
         "mueven juntas.\n\n"
         "Lo que no funciona es el flujo extresist de magic.  En una bobina\n"
@@ -555,9 +557,13 @@ def build(lang, out_dir=None):
         p.table(_ind_rows(src), widths=[0.20, 0.15, 0.46, 0.19])
         p.image("klayout_ind_sq_series.png",
                 {"en": "Series spiral: the turns on gate metal, the inner end taken out "
-                       "underneath on S/D metal through two openings in the dielectric.",
+                       "underneath on S/D metal through two openings in the dielectric, "
+                       "and out on the same side as the outer terminal. Everything the "
+                       "crossing is made of is a rectangle.",
                  "es": "Espiral en serie: las vueltas en metal de compuerta y el extremo "
-                       "interno saliendo por debajo en metal S/D, por dos aberturas."}[lang],
+                       "interno saliendo por debajo en metal S/D, por dos aberturas, "
+                       "hacia el mismo lado que el terminal exterior. Todo el cruce esta "
+                       "hecho de rectangulos."}[lang],
                 width=0.42)
         p.close(n)
 

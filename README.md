@@ -126,10 +126,71 @@ python3 libs.tech/klayout/tech/drc/run_drc.py --path <layout.gds> --topcell <cel
 `symbols/tft_igzo.sym`, pins **D G S** in that order - three terminals, no
 bulk, because a TFT sits on glass. `symbols/cap_mim.sym` and
 `symbols/ind_igzo.sym` are two-pin passives. `W`, `L` and `ov` are drawn
-dimensions in metres.
+dimensions in metres; `B` and `b_scale` are where a magnetic field enters.
 
-Testbenches: `tests/tft_iv.sch` sweeps the measured device, and
-`tests/tank_ac.sch` puts all three cells together as a 100 MHz tuned load.
+Starting xschem with the PDK selected opens **`tests/0_top.sch`**, the index of
+testbenches - the same arrangement sky130A and gf180mcuD use. Click a box,
+press `e`, and you are inside it:
+
+| Box | Schematic | What it shows |
+|---|---|---|
+| Output curves | `tests/tft_iv.sch` | Id-Vds on the device the model was validated against |
+| Transfer curves | `tests/tft_transfer.sch` | Id-Vgs at three drain biases, on a long and a short device |
+| Diode-connected TFT | `tests/tft_diode.sch` | the only rectifier this process can build |
+| Gate capacitance | `tests/tft_cv.sch` | the overlap against frequency, at four values of `ov` |
+| Magnetic field | `tests/tft_bfield.sch` | the classical term, and how far it is from measurable |
+| LC tank | `tests/tank_ac.sch` | all three cells together as a 100 MHz tuned load |
+
+Each one is self-contained - its own models, its own sources, its own
+`.control` block - and every one of them **draws its own signals on the
+sheet**. Simulate from xschem and the waveforms appear next to the circuit;
+there is nothing to load and no second window. That is a `flags=graph`
+rectangle with `autoload=1` and a `rawfile=$netlist_dir/<name>.raw`, the same
+mechanism sky130A and gf180mcuD use. A launcher on each sheet reloads them by
+hand (Ctrl-click) for looking at a run made earlier.
+
+They also `plot` when ngspice is driven from a prompt, but always behind
+
+```spice
+if $?batchmode = 0
+  plot id_sat
+end
+```
+
+because an unguarded interactive `plot` under `ngspice -b` produces nothing at
+all and takes the run with it. `run_checks.sh` re-runs every testbench, asserts
+the guard is there, and - the check that actually bites - asserts that every
+signal a graph names is present in the raw file that testbench just wrote. Two
+ways to get an empty graph, both silent: computing a vector after the `write`,
+and asking for `id` where ngspice stored `i(id)`.
+
+Three of these testbenches exist to show something the cell tables do not say:
+
+- **the contact.** `tft_transfer.sch` extracts Vth by linear extrapolation off
+  a L = 160 um device and returns -0.61 V, where the model card says +0.09 V.
+  Nothing is wrong: 2*Rc*W = 6.6 MOhm*um puts 6.6 kOhm in series with 46 kOhm
+  of channel, it takes an eighth of the drain bias, and the intercept moves.
+  The same bias sits on a measured wafer.
+- **the overlap, and its limit.** `tft_cv.sch` recovers `2*Cox*ov*W` exactly at
+  1 kHz - 15.64 pF at ov = 5 um - and then shows the contact taking it away:
+  13.6 pF at 1 MHz, and through zero by 10 MHz. That is why the AC behaviour
+  of this model cannot be trusted at RF.
+- **the field is not a sensor.** `tft_bfield.sch` puts one tesla on the device
+  and moves the drain current by 9.6e-8 of itself. `b_scale` then asks the
+  useful question - how far from classical a real effect would have to sit -
+  and the answer is about 322 times for one percent of current.
+
+The index and the box symbols are **generated**:
+
+```bash
+python3 scripts/build_test_symbols.py   # tests/*.sym and tests/0_top.sch
+```
+
+Add a testbench by adding one line to `TESTS` in that script, not by drawing a
+symbol.
+
+The old `tests/tft_iv.sch` and `tests/tank_ac.sch` keep their names, so
+anything that referred to them still works.
 
 ### ngspice - simulation
 
@@ -198,7 +259,7 @@ tools/                     shared code, so the repository stands alone
 └── coil_calculator/       the GUI calculators
 libs.tech/                 tool-specific
 ├── klayout/tech/          igzo_mmm_lab.{lyt,lyp,map}, PCells, DRC deck
-├── xschem/                symbol, xschemrc, testbenches
+├── xschem/                symbols, xschemrc, tests/ and its index
 ├── ngspice/               design.ngspice (wrappers), igzo_mmm_lab.ngspice (corners)
 ├── magic/                 igzo_mmm_lab.{tech,magicrc}
 └── netgen/                LVS setup

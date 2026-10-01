@@ -229,8 +229,8 @@ PARAMS = {
         ("shape", "square"), ("topology", "series"), ("n", "8"),
         ("d_in", "100 um"), ("w", "10 um"), ("gap", "5 um"),
         ("metal", "gate (2/0)"), ("t_metal", "0.05 um"),
-        ("f_eval", "100 MHz"), ("pad", "false"),
-        ("l_series", "16.38 nH"), ("r_ac", "377.7 Ohm"), ("q", "0.03"),
+        ("f_eval", "100 MHz"), ("inner_term", "true"), ("pad", "false"),
+        ("l_series", "16.38 nH"), ("r_ac", "379.0 Ohm"), ("q", "0.03"),
     ],
 }
 
@@ -299,9 +299,9 @@ EN = {
     "s7t": "Q is a metal thickness problem",
     "s7": "The same coil, the same 16.38 nH, thickness swept:",
     "s7rows": [["gold", "R at 100 MHz", "Q"],
-               ["50 nm (assumed today)", "377.7 Ohm", "0.03"],
-               ["250 nm", "75.5 Ohm", "0.14"],
-               ["1 um", "18.9 Ohm", "0.54"]],
+               ["50 nm (assumed today)", "379.0 Ohm", "0.03"],
+               ["250 nm", "75.8 Ohm", "0.14"],
+               ["1 um", "18.95 Ohm", "0.54"]],
     "s7b": "At 50 nm a planar inductor here is a resistor with some inductance.\n"
            "Nothing you can draw changes that - only thicker gold does.",
     "s8t": "Simulated against measured",
@@ -394,9 +394,9 @@ ES = {
     "s7t": "Q es un problema de espesor de metal",
     "s7": "La misma bobina, los mismos 16.38 nH, barriendo el espesor:",
     "s7rows": [["oro", "R a 100 MHz", "Q"],
-               ["50 nm (lo supuesto hoy)", "377.7 Ohm", "0.03"],
-               ["250 nm", "75.5 Ohm", "0.14"],
-               ["1 um", "18.9 Ohm", "0.54"]],
+               ["50 nm (lo supuesto hoy)", "379.0 Ohm", "0.03"],
+               ["250 nm", "75.8 Ohm", "0.14"],
+               ["1 um", "18.95 Ohm", "0.54"]],
     "s7b": "Con 50 nm, un inductor planar aqui es una resistencia con algo de\n"
            "inductancia.  Nada que dibujes lo cambia - solo oro mas grueso.",
     "s8t": "Simulado contra medido",

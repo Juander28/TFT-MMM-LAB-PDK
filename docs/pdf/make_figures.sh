@@ -54,14 +54,37 @@ XRC
 for pair in "symbols/tft_igzo.sym:xschem_sym.png" \
             "symbols/cap_mim.sym:xschem_cap_sym.png" \
             "symbols/ind_igzo.sym:xschem_ind_sym.png" \
+            "tests/0_top.sch:xschem_index.png" \
             "tests/tft_iv.sch:xschem_tb.png" \
+            "tests/tft_transfer.sch:xschem_transfer.png" \
+            "tests/tft_cv.sch:xschem_cv.png" \
+            "tests/tft_bfield.sch:xschem_bfield.png" \
+            "tests/tft_diode.sch:xschem_diode.png" \
             "tests/tank_ac.sch:xschem_tank.png" \
             "tests/tft_igzo_l10w100.sch:xschem_lvs.png"; do
     src="${pair%%:*}"; png="${pair##*:}"
+    base="$(basename "${src}" .sch)"
+    # A testbench is photographed WITH its waveforms: netlist it, run it, and
+    # load the raw before printing, or the graph rectangles on the sheet come
+    # out as empty boxes.  Symbols and the index have nothing to run.
+    load=""
+    case "${src}" in
+        tests/*.sch)
+            if grep -q "flags=graph" "${PDKPATH}/libs.tech/xschem/${src}"; then
+                timeout 60 xschem -n -q --rcfile "${HERE}/.xschemrc_fig" \
+                    "${PDKPATH}/libs.tech/xschem/${src}" >/dev/null 2>&1 || true
+                ( cd "${HERE}" && timeout 120 ngspice -b "${base}.spice" \
+                    >/dev/null 2>&1 ) || true
+                [ -s "${HERE}/${base}.raw" ] \
+                    && load="xschem raw_read ${HERE}/${base}.raw; "
+            fi
+            ;;
+    esac
     # xschem exits non-zero after a successful batch export, hence the || true
     timeout 60 xschem --rcfile "${HERE}/.xschemrc_fig" \
-        --tcl "after 1500 {xschem zoom_full; xschem print png ${FIG}/${png}; exit}" \
+        --tcl "after 1500 {${load}xschem zoom_full; after 600 {xschem print png ${FIG}/${png}; exit}}" \
         "${PDKPATH}/libs.tech/xschem/${src}" >/dev/null 2>&1 || true
+    rm -f "${HERE}/${base}.spice" "${HERE}/${base}.raw"
     echo "wrote ${FIG}/${png}"
 done
 rm -f "${HERE}/.xschemrc_fig"
