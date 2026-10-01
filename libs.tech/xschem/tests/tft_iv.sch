@@ -14,6 +14,29 @@ K {}
 V {}
 S {}
 E {}
+B 2 20 80 900 420 {flags=graph
+y1=0
+y2=0.0007
+ypos1=0
+ypos2=2
+divy=5
+subdivy=1
+unity=u
+x1=0
+x2=10
+divx=5
+subdivx=1
+unitx=1
+dataset=-1
+autoload=1
+rawfile=$netlist_dir/tft_iv.raw
+sim_type=dc
+logx=0
+logy=0
+color="4"
+node="i(id)"
+hilight_wave=-1
+}
 N 130 -490 130 -440 {
 lab=D}
 N 50 -410 90 -410 {
@@ -46,7 +69,27 @@ vs s 0 0
 .control
 save all
 dc vd 0 10 0.1 vg 0 6 1
+
+* A positive drain current, so the graph on the sheet reads the way the
+* measured curves do.  One dataset per VGS step - the graph shows all of
+* them because it is set to dataset=-1.
+let id = -i(vd)
 write tft_iv.raw
+
+* Drawn only when ngspice is run interactively.  Under 'ngspice -b' an
+* interactive plot produces nothing at all and hides the run, which is why
+* this is guarded rather than simply present.
+if $?batchmode = 0
+  plot id
+end
 .endc
 "}
 C {devices/title.sym} 160 -30 0 0 {name=l5 author="UCI/INRF - MMM Lab"}
+C {devices/launcher.sym} 940 40 0 0 {name=hw
+descr="Ctrl-click here to load or unload the waveforms by hand.
+The graphs load themselves after a simulation; this is for
+looking at a run made earlier."
+tclcommand="
+xschem raw_read $netlist_dir/[file tail [file rootname [xschem get current_name]]].raw
+"
+}

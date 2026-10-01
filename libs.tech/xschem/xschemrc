@@ -18,7 +18,12 @@ if { [info exists env(PDK)] && $env(PDK) ne {} } {
   set PDK TFT-MMM-LAB-PDK
 }
 
-set IGZO_PDK_PATH ${PDK_ROOT}/${PDK}
+# file normalize, not plain concatenation: `use-pdk TFT-MMM-LAB-PDK/` (a
+# tab-completed name keeps its slash) makes PDK end in "/", the path then
+# reads ".../TFT-MMM-LAB-PDK//libs.tech", and ngspice takes "//" as the start
+# of a comment - the .include is cut at the PDK root and every igzo_tft is an
+# "unknown subckt".  Normalizing removes the doubled slash.
+set IGZO_PDK_PATH [file normalize ${PDK_ROOT}/${PDK}]
 
 #### Where the SPICE models live.  Testbenches refer to $::IGZO_MODELS, the
 #### same way gf180mcu testbenches refer to $::180MCU_MODELS.
@@ -39,7 +44,7 @@ append XSCHEM_LIBRARY_PATH :${IGZO_PDK_PATH}/libs.tech/xschem
 append XSCHEM_LIBRARY_PATH :${IGZO_PDK_PATH}/libs.tech/xschem/tests
 
 #### Open this when xschem starts with no file argument
-set XSCHEM_START_WINDOW ${IGZO_PDK_PATH}/libs.tech/xschem/tests/tft_iv.sch
+set XSCHEM_START_WINDOW ${IGZO_PDK_PATH}/libs.tech/xschem/tests/0_top.sch
 
 #### Colour the PDK symbols so they are distinguishable from the generic ones
 set dircolor(${IGZO_PDK_PATH}/libs.tech/xschem$) green

@@ -21,6 +21,29 @@ K {}
 V {}
 S {}
 E {}
+B 2 20 80 1000 420 {flags=graph
+y1=-40
+y2=40
+ypos1=0
+ypos2=2
+divy=5
+subdivy=1
+unity=1
+x1=6
+x2=9
+divx=5
+subdivx=1
+unitx=1
+dataset=-1
+autoload=1
+rawfile=$netlist_dir/tank_ac.raw
+sim_type=ac
+logx=1
+logy=0
+color="4"
+node="vout_db"
+hilight_wave=-1
+}
 N 0 0 80 0 {
 lab=in}
 N 120 -80 120 -30 {
@@ -76,8 +99,24 @@ vin in 0 dc 2 ac 1
 .control
 save all
 ac dec 200 1meg 1g
+* A stored vector, because a graph on the sheet can only draw what the raw
+* file holds - vdb(out) is an expression and never gets written.
+let vout_db = vdb(out)
 write tank_ac.raw
 print v(out) > /dev/null
+
+* The tuned load, in dB against frequency: the peak is the point.
+if $?batchmode = 0
+  plot vout_db
+end
 .endc
 "}
 C {devices/title.sym} 160 200 0 0 {name=l5 author="UCI/INRF - MMM Lab"}
+C {devices/launcher.sym} 1040 40 0 0 {name=hw
+descr="Ctrl-click here to load or unload the waveforms by hand.
+The graphs load themselves after a simulation; this is for
+looking at a run made earlier."
+tclcommand="
+xschem raw_read $netlist_dir/[file tail [file rootname [xschem get current_name]]].raw
+"
+}
